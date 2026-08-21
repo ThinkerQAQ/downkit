@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const bridgeVersion = "1.0.7"
+const bridgeVersion = "1.0.8"
 
 type bridgeConfig struct {
 	OutputDir    string `json:"outputDir"`

@@ -197,11 +197,11 @@ func (networkProxyTool) Snapshot(ctx context.Context, config bridgeConfig) toolS
 	health := toolHealth{Status: "disabled", OK: true, Summary: "未启用 · Bridge 外网直连", CheckedAt: time.Now()}
 	enabled := proxyEnabled(config)
 	if enabled && config.Proxy != "" {
-		latency, err := probeProxyConnectivity(ctx, config.Proxy, proxyConnectivityURL)
+		latency, target, err := probeAnyProxyConnectivity(ctx, config.Proxy, proxyConnectivityURLs[:])
 		if err != nil {
 			health = toolHealth{Status: "error", OK: false, Summary: "代理网络不通", Detail: err.Error(), CheckedAt: time.Now()}
 		} else {
-			health = toolHealth{Status: "ready", OK: true, Summary: "代理网络通畅", Detail: fmt.Sprintf("外网请求经 %s · %d ms", config.Proxy, latency.Milliseconds()), CheckedAt: time.Now()}
+			health = toolHealth{Status: "ready", OK: true, Summary: "代理网络通畅", Detail: fmt.Sprintf("外网请求经 %s · %s · %d ms", config.Proxy, logURLSummary(target), latency.Milliseconds()), CheckedAt: time.Now()}
 		}
 	}
 	return toolSnapshot{

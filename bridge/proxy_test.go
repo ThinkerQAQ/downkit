@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -102,5 +103,58 @@ func TestProbeProxyConnectivityUsesConfiguredProxy(t *testing.T) {
 	}
 	if proxyHits != 1 || targetHits != 1 {
 		t.Fatalf("probe did not traverse proxy: proxy=%d target=%d", proxyHits, targetHits)
+	}
+}
+
+func TestProxyConnectivityTargetsUseGoogleAndCloudflare(t *testing.T) {
+	want := [...]string{
+		"https://www.google.com/generate_204",
+		"https://cp.cloudflare.com/generate_204",
+	}
+	if proxyConnectivityURLs != want {
+		t.Fatalf("proxy connectivity targets = %#v", proxyConnectivityURLs)
+	}
+}
+
+func TestProbeAnyProxyConnectivitySucceedsWhenOneTargetWorks(t *testing.T) {
+	failingTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusBadGateway)
+	}))
+	defer failingTarget.Close()
+	successfulTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer successfulTarget.Close()
+
+	_, target, err := probeAnyProxyConnectivity(context.Background(), "", []string{failingTarget.URL, successfulTarget.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target != successfulTarget.URL {
+		t.Fatalf("successful target = %q", target)
+	}
+}
+
+func TestProbeAnyProxyConnectivityFailsOnlyWhenAllTargetsFail(t *testing.T) {
+	firstTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusBadGateway)
+	}))
+	defer firstTarget.Close()
+	secondTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer secondTarget.Close()
+
+	_, target, err := probeAnyProxyConnectivity(context.Background(), "", []string{firstTarget.URL, secondTarget.URL})
+	if err == nil {
+		t.Fatal("expected all-targets failure")
+	}
+	if target != "" {
+		t.Fatalf("successful target = %q", target)
+	}
+	for _, expected := range []string{"HTTP 502", "HTTP 503", firstTarget.URL, secondTarget.URL} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("error %q does not contain %q", err, expected)
+		}
 	}
 }

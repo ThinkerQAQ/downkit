@@ -12,7 +12,16 @@ import (
 	"time"
 )
 
-const proxyConnectivityURL = "https://www.gstatic.com/generate_204"
+var proxyConnectivityURLs = [...]string{
+	"https://www.google.com/generate_204",
+	"https://cp.cloudflare.com/generate_204",
+}
+
+type proxyConnectivityResult struct {
+	target  string
+	latency time.Duration
+	err     error
+}
 
 // normalizeProxyAddress accepts the legacy full proxy value as well as the
 // host/port fields exposed by the proxy tool. DownKit currently supports HTTP
@@ -90,4 +99,42 @@ func probeProxyConnectivity(ctx context.Context, proxy, target string) (time.Dur
 		return latency, fmt.Errorf("连通性检测返回 HTTP %d", response.StatusCode)
 	}
 	return latency, nil
+}
+
+func probeAnyProxyConnectivity(ctx context.Context, proxy string, targets []string) (time.Duration, string, error) {
+	if len(targets) == 0 {
+		return 0, "", errors.New("没有配置代理连通性检测端点")
+	}
+
+	probeContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	results := make(chan proxyConnectivityResult, len(targets))
+	started := time.Now()
+	for _, target := range targets {
+		target := target
+		go func() {
+			latency, err := probeProxyConnectivity(probeContext, proxy, target)
+			results <- proxyConnectivityResult{target: target, latency: latency, err: err}
+		}()
+	}
+
+	failures := make([]string, 0, len(targets))
+	for range targets {
+		result := <-results
+		if result.err == nil {
+			fmt.Fprintf(consoleErr,
+				"timestamp=%q severity=%q node=%q operation=%q status=%q target=%q durationMs=%d\n",
+				time.Now().Format(time.RFC3339Nano), "info", "network-proxy", "connectivity-probe",
+				"success", logURLSummary(result.target), result.latency.Milliseconds())
+			return result.latency, result.target, nil
+		}
+		failures = append(failures, fmt.Sprintf("%s: %v", logURLSummary(result.target), result.err))
+	}
+
+	err := fmt.Errorf("全部代理检测端点均失败：%s", strings.Join(failures, "；"))
+	fmt.Fprintf(consoleErr,
+		"timestamp=%q severity=%q node=%q operation=%q status=%q targetCount=%d durationMs=%d error=%q\n",
+		time.Now().Format(time.RFC3339Nano), "error", "network-proxy", "connectivity-probe",
+		"failed", len(targets), time.Since(started).Milliseconds(), err.Error())
+	return time.Since(started), "", err
 }

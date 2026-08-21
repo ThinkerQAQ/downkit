@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DownKit 助手",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvb0qlyZwQUAxrvsGvQGIdJkosYKUp0rbbOClvGwM00/fv4A+Fi7XGOuXXozkEX68jQ/hVqKwjw0DUNSZFB378YJuTC6bi0NjuSzD7z237V6m4KBqFoAGpQJ7dLsX1L9vKafqKnF7JWRfSUvp4a7UBxlqMTBxhGUgWBIVXhWrvs1Ka7F4M/ZKc44QVupRXF/TlHreUJVT9SlSvDUCXgTl64/7XRHLL6y2sqhN6ezTSqfT/l5ChLanQ0dB/aphKShaQJJ1rS17aR5wMDLU17hm/XJ69+XAXsEALeq+PYBai0KJg78Qc3iT/SGOi54O3CpkywpMyDhWzhg3+jizLL2FVwIDAQAB",
   "description": "检测当前页面的 HLS、DASH、MP4 和分离媒体轨，并交给 DownKit 下载。",
   "permissions": [
