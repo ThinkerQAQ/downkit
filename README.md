@@ -2,6 +2,25 @@
 
 DownKit 是一个通过 Chrome 或 Edge 扩展发现网页中的 M3U8、DASH 和 MP4 媒体，并交给本机 Bridge 下载和封装的跨平台工具。
 
+## 使用效果
+
+<table>
+  <tr>
+    <td width="64%"><img src="docs/images/resource-detection.png" alt="DownKit 检测当前网页中的媒体资源"></td>
+    <td width="36%"><img src="docs/images/download-progress.png" alt="DownKit 下载任务进度"></td>
+  </tr>
+  <tr>
+    <td align="center">检测当前页面的媒体资源并发起下载</td>
+    <td align="center">查看实时速度、进度与任务状态</td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="docs/images/tool-registry.png" alt="DownKit 工具与配置状态" width="42%"><br>
+      检查 Bridge、下载能力与外部组件状态
+    </td>
+  </tr>
+</table>
+
 ## 安装与使用
 
 Windows、Linux 和 macOS 的整体流程相同：加载浏览器扩展、注册本机 Bridge，然后由浏览器按需自动启动 Bridge；无需手动常驻运行 Bridge。
