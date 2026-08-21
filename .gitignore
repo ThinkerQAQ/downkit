@@ -1,0 +1,31 @@
+# Local caches and diagnostics
+/.cache/
+/.codex-diagnostics/
+/.build/
+
+# Release and generated artifacts
+/dist/
+*.apk
+*.aab
+*.aar
+*.so
+*.pending.exe
+*.exe~
+
+# Android and Gradle local state
+/mobile/android/.gradle/
+/mobile/android/.kotlin/
+/mobile/android/local.properties
+/mobile/android/app/build/
+/mobile/android/app/libs/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.suo
+.DS_Store
+Thumbs.db
+
+# Unrelated local notes
+/6周驾驶训练营_理论实操一体化_V2.md

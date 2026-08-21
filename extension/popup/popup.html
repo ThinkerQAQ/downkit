@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DownKit 助手</title>
+  <script src="surface.js"></script>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img src="../icons/icon-32.png" alt="" width="24" height="24">
+      <div>
+        <h1>DownKit <span id="extensionVersion"></span></h1>
+        <p>媒体下载助手</p>
+      </div>
+    </div>
+    <span id="bridgeIndicator" class="indicator checking">环境检测中</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button id="snifferTab" class="tab active" data-tab="sniffer" role="tab" aria-controls="snifferPanel" aria-selected="true" tabindex="0">资源嗅探</button>
+    <button id="jobsTab" class="tab" data-tab="jobs" role="tab" aria-controls="jobsPanel" aria-selected="false" tabindex="-1">下载任务</button>
+    <button id="environmentTab" class="tab" data-tab="environment" role="tab" aria-controls="environmentPanel" aria-selected="false" tabindex="-1">工具与配置</button>
+  </nav>
+
+  <section id="snifferPanel" class="panel active" data-panel="sniffer" role="tabpanel" aria-labelledby="snifferTab">
+    <div class="section-heading compact">
+      <div><h2>当前页面资源</h2><p id="pageTitle">正在检测当前页面…</p></div>
+      <button id="clearMedia" class="secondary" type="button">清空</button>
+    </div>
+    <div id="mediaList" class="media-list" aria-live="polite"></div>
+    <p id="emptyMedia" class="empty" hidden>尚未检测到媒体。请先播放视频，再重新打开扩展。</p>
+    <p id="downloadMessage" class="message" role="status"></p>
+  </section>
+
+  <section id="jobsPanel" class="panel" data-panel="jobs" role="tabpanel" aria-labelledby="jobsTab">
+    <div class="section-heading compact jobs-heading">
+      <div><h2>最近任务</h2><p>显示下载进度与任务操作。</p></div>
+      <div class="jobs-toolbar">
+        <div class="overall-speed" aria-live="polite">
+          <span>总速度</span>
+          <strong id="overallSpeed">0 B/s</strong>
+        </div>
+        <div class="inline-actions">
+          <button id="refreshJobs" class="icon-button" type="button" title="刷新">刷新</button>
+          <button id="clearJobs" class="icon-button" type="button" title="清理已结束任务">清理</button>
+        </div>
+      </div>
+    </div>
+    <div id="jobList" class="job-list" aria-live="polite"></div>
+    <p id="emptyJobs" class="empty" hidden>还没有下载任务。</p>
+    <p id="jobsMessage" class="message" role="status"></p>
+  </section>
+
+  <section id="environmentPanel" class="panel" data-panel="environment" role="tabpanel" aria-labelledby="environmentTab">
+    <div class="open-mode-setting">
+      <label for="openMode">打开方式</label>
+      <select id="openMode">
+        <option value="popup">弹出窗口（默认）</option>
+        <option value="sidePanel">浏览器侧边栏</option>
+      </select>
+      <span id="openModeHint">下次点击扩展图标时生效</span>
+    </div>
+    <div class="section-heading">
+      <div><h2>Tool Registry</h2><p>按连接、能力和依赖统一管理</p></div>
+      <button id="refreshEnvironment" class="secondary" type="button">重新检测</button>
+    </div>
+
+    <div id="bridgeConfig" class="tool-form">
+      <div id="toolList" class="tool-list" aria-live="polite">
+        <p class="empty">正在读取 Tool Registry…</p>
+      </div>
+    </div>
+    <p id="environmentMessage" class="message" role="status"></p>
+  </section>
+
+  <template id="mediaTemplate">
+    <article class="media-item">
+      <div class="item-main">
+        <div class="media-title"><strong class="resource-name"></strong><span class="label"></span></div>
+        <span class="url"></span>
+      </div>
+      <div class="media-actions">
+        <button class="secondary copy" type="button" title="复制完整资源地址">复制</button>
+        <button class="primary download" type="button">下载</button>
+      </div>
+    </article>
+  </template>
+  <template id="jobTemplate">
+    <article class="job-item">
+      <div class="job-top"><strong class="job-title"></strong><span class="job-state"></span></div>
+      <div class="job-progress-row">
+        <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="job-progress-value"></span></div>
+        <strong class="job-speed">—</strong>
+        <strong class="job-percent">0%</strong>
+      </div>
+      <span class="job-detail"></span>
+      <span class="job-meta"></span>
+      <p class="job-error" hidden></p>
+      <div class="job-files" hidden>
+        <button class="job-files-toggle" type="button" aria-expanded="false">
+          <span class="job-files-chevron" aria-hidden="true">›</span>
+          <span class="job-files-summary"></span>
+          <span class="job-files-count"></span>
+          <span class="job-files-status"></span>
+        </button>
+        <div class="job-file-list" hidden></div>
+      </div>
+      <div class="job-actions">
+        <button class="secondary job-primary-action" type="button" hidden></button>
+        <button class="text-button danger job-delete" type="button">删除…</button>
+      </div>
+    </article>
+  </template>
+  <template id="jobFileTemplate">
+    <div class="job-file-item">
+      <span class="job-file-index"></span>
+      <span class="job-file-name"></span>
+      <span class="job-file-state"></span>
+      <div class="job-file-actions">
+        <button class="job-output-action job-file-open" type="button" hidden>打开</button>
+        <button class="job-output-action job-file-reveal" type="button" hidden>位置</button>
+      </div>
+    </div>
+  </template>
+
+  <dialog id="playlistDialog" class="playlist-dialog">
+    <form method="dialog">
+      <h2>检测到播放列表</h2>
+      <p>当前页面包含 <strong class="playlist-count"></strong> 个视频，请选择下载范围。</p>
+      <div class="dialog-actions">
+        <button class="secondary" type="submit" value="cancel">取消</button>
+        <button class="secondary" type="submit" value="single">仅下载当前视频</button>
+        <button class="primary playlist-all" type="submit" value="all">下载全部视频</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteJobDialog" class="playlist-dialog delete-job-dialog">
+    <form method="dialog">
+      <h2>删除下载任务？</h2>
+      <p class="delete-job-description"></p>
+      <div class="dialog-actions">
+        <button class="secondary" type="submit" value="cancel">取消</button>
+        <button class="secondary delete-record-only" type="submit" value="record">仅删除记录</button>
+        <button class="danger-button delete-with-files" type="submit" value="files">删除记录和文件</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../core/media.js"></script>
+  <script src="core.js"></script>
+  <script src="environment.js"></script>
+  <script src="jobs.js"></script>
+  <script src="playlist-dialog.js"></script>
+  <script src="downloads.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
