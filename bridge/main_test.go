@@ -216,6 +216,19 @@ func TestBridgeTaskCarriesStructuredCookiesOutsideHeaders(t *testing.T) {
 	}
 }
 
+func TestBridgeTaskCarriesSubtitleRequest(t *testing.T) {
+	opts, err := optionsFromBridgeTask(bridgeTask{
+		URL: "https://media.test/master.m3u8", Title: "test", PageURL: "https://page.test/watch",
+		Subtitles: SubtitleRequest{Mode: "site", Languages: []string{"zh.*", "zh.*"}, IncludeAutomatic: true},
+	}, defaultBridgeConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.pageURL != "https://page.test/watch" || !opts.subtitleRequest.enabled() || len(opts.subtitleRequest.Languages) != 1 || opts.subtitleRequest.Format != "best" {
+		t.Fatalf("subtitle request was not normalized: page=%q request=%#v", opts.pageURL, opts.subtitleRequest)
+	}
+}
+
 func TestParseFFmpegVersion(t *testing.T) {
 	tests := []struct {
 		line        string

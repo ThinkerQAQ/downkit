@@ -65,7 +65,6 @@ func (w *ytDLPProgressWriter) writeLine(line string, newline bool) error {
 		return nil
 	}
 	if output, ok := parseYTDLPOutput(line); ok {
-		publishJobOutputFile(output.path, output.index, output.id)
 		if newline {
 			_, err := fmt.Fprintln(w.dest, "完成："+output.path)
 			return err

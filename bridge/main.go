@@ -3,6 +3,7 @@ package downkit
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -56,7 +57,9 @@ type options struct {
 	pageRequestHeaders map[string]string
 	mediaCookies       []browserCookie
 	pageCookies        []browserCookie
+	pageURL            string
 	resolvePage        bool
+	subtitleRequest    SubtitleRequest
 	jobID              string
 }
 
@@ -110,6 +113,7 @@ type app struct {
 	useCurlHTTP          bool
 	segmentProgressStart int
 	segmentProgressSpan  int
+	subtitlePipeline     SubtitlePipeline
 }
 
 var (
@@ -205,12 +209,18 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	if separatedMedia && platformMuxer != nil {
 		return errors.New("移动端第一版暂不支持由页面解析分离媒体轨，请发送到桌面版处理")
 	}
+	if opts.subtitleRequest.enabled() && platformMuxer != nil {
+		return errors.New("移动端第一版暂不支持原站字幕下载，请发送到桌面版处理")
+	}
 	tools := map[string]*string{}
 	if separatedMedia {
 		tools["ffmpeg"] = &opts.ffmpegPath
 		tools["yt-dlp"] = &opts.ytDLPPath
 	} else if !directMP4 && platformMuxer == nil {
 		tools["ffmpeg"] = &opts.ffmpegPath
+	}
+	if opts.subtitleRequest.enabled() {
+		tools["yt-dlp"] = &opts.ytDLPPath
 	}
 	for name, value := range tools {
 		path, err := findTool(*value, name)
@@ -251,6 +261,7 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 		muxer:         platformMuxer,
 		mediaSession:  newMediaHTTPSession(opts),
 	}
+	a.subtitlePipeline = newSubtitlePipeline(a, nil, nil)
 	if a.muxer == nil && !directMP4 {
 		a.muxer = ffmpegMuxer{path: opts.ffmpegPath, stdout: os.Stdout, stderr: os.Stderr}
 	}
@@ -267,11 +278,12 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	if separatedMedia {
 		publishJobPhaseProgress("resolving", 0, "正在准备解析", 0, 0, 0)
 		publishJobPhaseProgress("resolving", 10, "正在解析媒体页面", 0, 0, 0)
-		if err := a.downloadResolvedPage(resolverPage); err != nil {
+		outputs, err := a.downloadResolvedPage(resolverPage)
+		if err != nil {
 			return keepWorkError(workDir, err)
 		}
-		if !opts.keepWork {
-			_ = os.RemoveAll(workDir)
+		if err := a.finalizeOutputs(outputs); err != nil {
+			return keepWorkError(workDir, err)
 		}
 		return nil
 	}
@@ -291,16 +303,21 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 		if err := a.downloadDirectFile(opts.sourceURL, outputPath); err != nil {
 			return keepWorkError(workDir, err)
 		}
-		publishJobOutput(outputPath)
-		if !opts.keepWork {
-			_ = os.RemoveAll(workDir)
+		if err := a.finalizeOutputs([]MediaOutput{{Path: outputPath, Title: opts.title}}); err != nil {
+			return keepWorkError(workDir, err)
 		}
-		fmt.Fprintln(consoleOut, "完成：", outputPath)
 		return nil
 	}
 	if resumePlan, ok := loadHLSResumePlan(a); ok {
 		fmt.Fprintln(consoleOut, "检测到已保存的 HLS 解析计划，跳过重新解析")
-		return a.resumeHLS(resumePlan)
+		outputs, err := a.resumeHLS(resumePlan)
+		if err != nil {
+			return err
+		}
+		if err := a.finalizeOutputs(outputs); err != nil {
+			return keepWorkError(workDir, err)
+		}
+		return nil
 	}
 
 	publishJobPhaseProgress("resolving", 0, "正在准备解析", 0, 0, 0)
@@ -399,14 +416,9 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	if err := a.mux(outputPath, audioInput); err != nil {
 		return keepWorkError(workDir, err)
 	}
-	publishJobOutput(outputPath)
-
-	if !opts.keepWork {
-		if err := os.RemoveAll(workDir); err != nil {
-			fmt.Fprintln(consoleOut, "警告：无法清理工作目录：", err)
-		}
+	if err := a.finalizeOutputs([]MediaOutput{{Path: outputPath, Title: opts.title}}); err != nil {
+		return keepWorkError(workDir, err)
 	}
-	fmt.Fprintln(consoleOut, "完成：", outputPath)
 	return nil
 }
 
@@ -908,10 +920,10 @@ func choosePlaylistMode(input io.Reader, output io.Writer, count int) string {
 	}
 }
 
-func (a *app) downloadResolvedPage(pageURL string) error {
+func (a *app) downloadResolvedPage(pageURL string) ([]MediaOutput, error) {
 	access, err := a.prepareYTDLPAccess(pageURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer access.cleanup()
 	fmt.Fprintln(consoleOut, "检测到需要从来源页面解析的分离媒体资源。")
@@ -979,7 +991,9 @@ func (a *app) downloadResolvedPage(pageURL string) error {
 
 	var lastErr error
 	outputRecord := filepath.Join(a.workDir, "yt-dlp-outputs.txt")
+	subtitleRecord := filepath.Join(a.workDir, "yt-dlp-subtitles.txt")
 	_ = os.Remove(outputRecord)
+	_ = os.Remove(subtitleRecord)
 	publishJobPhaseProgress("resolving", 100, "解析完成", 0, 0, 0)
 	publishJobPhaseProgress("downloading", 0, "准备下载页面媒体", 0, 0, 0)
 	for i, attempt := range attempts {
@@ -990,15 +1004,35 @@ func (a *app) downloadResolvedPage(pageURL string) error {
 			}
 			fmt.Fprintf(consoleOut, "yt-dlp 改用%s重试。\n", mode)
 		}
-		if err := a.runYTDLP(downloadURL, outputTemplate, outputRecord, downloadAll, attempt); err == nil {
-			a.publishRecordedOutputs(outputRecord)
-			return nil
+		if err := a.runYTDLP(downloadURL, outputTemplate, outputRecord, subtitleRecord, downloadAll, attempt); err == nil {
+			outputs, readErr := a.recordedMediaOutputs(outputRecord)
+			if readErr != nil {
+				return nil, readErr
+			}
+			for outputIndex := range outputs {
+				outputs[outputIndex].SubtitleAttempted = a.opts.subtitleRequest.enabled()
+			}
+			artifacts, readErr := readYTDLPSubtitleArtifacts(subtitleRecord, outputs, a.opts.outputDir)
+			if readErr != nil {
+				return nil, readErr
+			}
+			for artifactIndex := range artifacts {
+				for outputIndex := range outputs {
+					if artifacts[artifactIndex].MediaPath == outputs[outputIndex].Path ||
+						artifacts[artifactIndex].MediaID != "" && strings.EqualFold(artifacts[artifactIndex].MediaID, outputs[outputIndex].ItemID) ||
+						artifacts[artifactIndex].MediaIndex > 0 && artifacts[artifactIndex].MediaIndex == outputs[outputIndex].Index {
+						outputs[outputIndex].SubtitleArtifacts = appendUniqueSubtitleArtifacts(outputs[outputIndex].SubtitleArtifacts, artifacts[artifactIndex])
+						break
+					}
+				}
+			}
+			return outputs, nil
 		} else {
 			lastErr = err
 			fmt.Fprintln(consoleErr, "yt-dlp 本轮失败：", err)
 		}
 	}
-	return fmt.Errorf("yt-dlp 的直连/代理尝试均失败：%w", lastErr)
+	return nil, fmt.Errorf("yt-dlp 的直连/代理尝试均失败：%w", lastErr)
 }
 
 func writeTaskCookieFile(workDir, filename string, cookies []browserCookie) (string, error) {
@@ -1080,8 +1114,8 @@ func (a *app) appendYTDLPAccessArgs(args []string, pageURL string, attempt ytDLP
 	return append(args, "--referer", pageURL)
 }
 
-func (a *app) runYTDLP(pageURL, outputTemplate, outputRecord string, downloadAll bool, attempt ytDLPAttempt) error {
-	args := a.ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord, downloadAll, attempt)
+func (a *app) runYTDLP(pageURL, outputTemplate, outputRecord, subtitleRecord string, downloadAll bool, attempt ytDLPAttempt) error {
+	args := a.ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord, subtitleRecord, downloadAll, attempt)
 	err, detail := a.runYTDLPCommand(args)
 	if err == nil {
 		return nil
@@ -1117,7 +1151,11 @@ func describeYTDLPFailure(err error, detail string) error {
 }
 
 func (a *app) runYTDLPCommand(args []string) (error, string) {
-	cmd := exec.Command(a.opts.ytDLPPath, args...)
+	return a.runYTDLPCommandContext(context.Background(), args)
+}
+
+func (a *app) runYTDLPCommandContext(ctx context.Context, args []string) (error, string) {
+	cmd := exec.CommandContext(ctx, a.opts.ytDLPPath, args...)
 	stdout := newYTDLPProgressWriter(consoleOut)
 	var errorOutput tailBuffer
 	errorOutput.limit = 64 * 1024
@@ -1185,7 +1223,7 @@ func (b *tailBuffer) String() string {
 	return string(b.data)
 }
 
-func (a *app) ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord string, downloadAll bool, attempt ytDLPAttempt) []string {
+func (a *app) ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord, subtitleRecord string, downloadAll bool, attempt ytDLPAttempt) []string {
 	archive := filepath.Join(a.workDir, "yt-dlp-archive.txt")
 	args := []string{
 		"--no-color", "--newline", "--progress", "--windows-filenames",
@@ -1200,7 +1238,17 @@ func (a *app) ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord string, do
 		"--ffmpeg-location", a.opts.ffmpegPath,
 		"--paths", a.opts.outputDir, "--output", outputTemplate,
 		"--print", "after_move:downkit-output:%(playlist_index)s|%(id)s|%(filepath)s",
-		"--print-to-file", "after_move:%(filepath)s", strings.ReplaceAll(outputRecord, "%", "%%"),
+		"--print-to-file", "after_move:downkit-output:%(playlist_index)s|%(id)s|%(filepath)s", strings.ReplaceAll(outputRecord, "%", "%%"),
+	}
+	if a.opts.subtitleRequest.enabled() {
+		args = append(args,
+			"--write-subs", "--sub-langs", strings.Join(a.opts.subtitleRequest.Languages, ","),
+			"--sub-format", a.opts.subtitleRequest.Format,
+			"--print-to-file", "after_video:"+ytDLPSubtitleRecordPrefix+"%(playlist_index)s|%(id)s|%(requested_subtitles)j", strings.ReplaceAll(subtitleRecord, "%", "%%"),
+		)
+		if a.opts.subtitleRequest.IncludeAutomatic {
+			args = append(args, "--write-auto-subs")
+		}
 	}
 	if downloadAll {
 		args = append(args, "--yes-playlist", "--trim-filenames", "100")
@@ -1212,15 +1260,19 @@ func (a *app) ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord string, do
 	return args
 }
 
-func (a *app) publishRecordedOutputs(record string) {
+func (a *app) recordedMediaOutputs(record string) ([]MediaOutput, error) {
 	data, err := os.ReadFile(record)
 	if err != nil {
-		fmt.Fprintln(consoleErr, "警告：无法读取 yt-dlp 输出文件记录：", err)
-		return
+		return nil, fmt.Errorf("无法读取 yt-dlp 输出文件记录：%w", err)
 	}
 	seen := make(map[string]bool)
+	result := make([]MediaOutput, 0)
 	for _, line := range splitLines(string(data)) {
-		path := strings.TrimSpace(line)
+		recorded, ok := parseYTDLPOutput(line)
+		if !ok {
+			continue
+		}
+		path := strings.TrimSpace(recorded.path)
 		if path == "" {
 			continue
 		}
@@ -1233,8 +1285,14 @@ func (a *app) publishRecordedOutputs(record string) {
 			continue
 		}
 		seen[key] = true
-		publishJobOutput(path)
+		result = append(result, MediaOutput{
+			Path: path, Title: filepath.Base(path), Index: recorded.index, ItemID: recorded.id,
+		})
 	}
+	if len(result) == 0 {
+		return nil, errors.New("yt-dlp 下载完成但没有记录媒体产物")
+	}
+	return result, nil
 }
 
 func (a *app) fetchPlaylist(sourceURL, name string) (string, error) {

@@ -85,10 +85,25 @@
     return quality ? quality.value : "";
   }
 
+  function selectedSubtitleRequest(source) {
+    const select = (source || document).getElementById("subtitleMode");
+    switch (select ? select.value : "none") {
+      case "site-zh":
+        return { mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best" };
+      case "site-en":
+        return { mode: "site", languages: ["en.*"], includeAutomatic: true, format: "best" };
+      case "site-all":
+        return { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
+      default:
+        return { mode: "none" };
+    }
+  }
+
   async function download(resource) {
     api.setMessage("downloadMessage", "正在检测播放列表…");
     try {
       const quality = selectedQuality();
+      const subtitles = selectedSubtitleRequest();
       const probe = await api.send("media.playlist.probe", { resource, page, quality });
       const playlist = await root.DownKitPlaylistDialog.choose(probe);
       if (!playlist) {
@@ -100,7 +115,8 @@
         resource,
         page,
         quality,
-        playlist
+        playlist,
+        subtitles
       });
       api.setMessage("downloadMessage", `任务 ${response.taskId} 已提交。`, "ok");
 	  await api.activateTab("jobs");
@@ -138,6 +154,6 @@
 
   root.DownKitDownloads = { init, activate, deactivate };
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { selectedQuality, copyText };
+    module.exports = { selectedQuality, selectedSubtitleRequest, copyText };
   }
 })(globalThis);

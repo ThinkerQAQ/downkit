@@ -42,6 +42,10 @@ h1 span { margin-left: 4px; color: #9db4b2; font-size: 9px; font-weight: 600; }
 .open-mode-setting label { color: #35434a; font-size: 10px; font-weight: 650; white-space: nowrap; }
 .open-mode-setting select { height: 27px; margin: 0; }
 .open-mode-setting span { color: var(--muted); font-size: 8px; white-space: nowrap; }
+.download-options { display: grid; grid-template-columns: auto minmax(150px, 220px) minmax(0, 1fr); align-items: center; gap: 7px; margin: 5px 0 7px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
+.download-options label { color: #35434a; font-size: 10px; font-weight: 650; }
+.download-options select { height: 27px; margin: 0; }
+.download-options span { color: var(--muted); font-size: 8px; line-height: 1.35; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 7px 0 5px; }
 .section-heading.compact { margin-top: 3px; }
 .section-heading h2 { margin: 0; font-size: 12px; font-weight: 650; }
@@ -197,6 +201,8 @@ button:disabled { opacity: .55; cursor: default; }
 @media (max-width: 330px) {
   .open-mode-setting { grid-template-columns: auto 1fr; }
   .open-mode-setting span { grid-column: 1 / -1; }
+  .download-options { grid-template-columns: auto 1fr; }
+  .download-options span { grid-column: 1 / -1; }
   .tool-fields { grid-template-columns: 1fr; }
   .tool-field.wide { grid-column: auto; }
   .tool-values { grid-template-columns: 1fr; }

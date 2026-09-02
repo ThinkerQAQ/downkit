@@ -96,6 +96,18 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	}
 }
 
+func TestExecutableToolConfiguredPathUsesExplicitReader(t *testing.T) {
+	config := bridgeConfig{FFmpegPath: "ffmpeg-custom", YTDLPPath: "yt-dlp-custom"}
+	tool := executableTool{configKey: "futureToolPath"}
+	if got := tool.configuredPath(config); got != "" {
+		t.Fatalf("tool without a config reader inherited an unrelated path: %q", got)
+	}
+	tool.readConfiguredPath = func(config bridgeConfig) string { return config.FFmpegPath }
+	if got := tool.configuredPath(config); got != "ffmpeg-custom" {
+		t.Fatalf("explicit config reader returned %q", got)
+	}
+}
+
 func TestMobileToolsJSONUsesPlatformToolsWithoutBridge(t *testing.T) {
 	var payload struct {
 		Version int            `json:"version"`

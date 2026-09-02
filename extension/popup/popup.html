@@ -30,6 +30,16 @@
       <div><h2>当前页面资源</h2><p id="pageTitle">正在检测当前页面…</p></div>
       <button id="clearMedia" class="secondary" type="button">清空</button>
     </div>
+    <div class="download-options">
+      <label for="subtitleMode">字幕</label>
+      <select id="subtitleMode">
+        <option value="none">不下载字幕</option>
+        <option value="site-zh">原站中文（含自动字幕）</option>
+        <option value="site-en">原站英文（含自动字幕）</option>
+        <option value="site-all">全部原站字幕</option>
+      </select>
+      <span>优先保存网站已有字幕；当前版本不做语音识别和翻译。</span>
+    </div>
     <div id="mediaList" class="media-list" aria-live="polite"></div>
     <p id="emptyMedia" class="empty" hidden>尚未检测到媒体。请先播放视频，再重新打开扩展。</p>
     <p id="downloadMessage" class="message" role="status"></p>

@@ -92,9 +92,9 @@ func validateHLSResumePlan(plan hlsResumePlan) error {
 	return nil
 }
 
-func (a *app) resumeHLS(plan hlsResumePlan) error {
+func (a *app) resumeHLS(plan hlsResumePlan) ([]MediaOutput, error) {
 	if err := validateHLSResumePlan(plan); err != nil {
-		return err
+		return nil, err
 	}
 	segments := restoreSegments(plan.Segments, a.segmentDir)
 	// A paused worker loses its in-memory cookie jar and transport choice. Touch
@@ -104,7 +104,7 @@ func (a *app) resumeHLS(plan hlsResumePlan) error {
 	// which segment URLs and files are resumed.
 	publishJobPhaseProgress("resolving", a.segmentDownloadProgress(segmentCompletionPercent(segments)), "正在恢复媒体会话", segmentDownloadedBytes(segments), segmentTotalBytes(segments), 0)
 	if _, err := a.fetchPlaylist(a.opts.sourceURL, "resume-session.m3u8"); err != nil {
-		return keepWorkError(a.workDir, fmt.Errorf("恢复媒体会话失败：%w", err))
+		return nil, keepWorkError(a.workDir, fmt.Errorf("恢复媒体会话失败：%w", err))
 	}
 	audioSegments := restoreSegments(plan.AudioSegments, filepath.Join(a.workDir, "audio", "segments"))
 	var audioApp *app
@@ -122,27 +122,20 @@ func (a *app) resumeHLS(plan hlsResumePlan) error {
 	}
 	publishJobPhaseProgress("downloading", a.segmentDownloadProgress(segmentCompletionPercent(segments)), "正在恢复已有媒体分片", segmentDownloadedBytes(segments), segmentTotalBytes(segments), 0)
 	if err := a.downloadSegments(segments); err != nil {
-		return keepWorkError(a.workDir, err)
+		return nil, keepWorkError(a.workDir, err)
 	}
 	if audioApp != nil {
 		if err := audioApp.downloadSegments(audioSegments); err != nil {
-			return keepWorkError(a.workDir, err)
+			return nil, keepWorkError(a.workDir, err)
 		}
 	}
 	outputPath, err := resumableOutputPath(a.workDir, a.opts.outputDir, a.opts.title)
 	if err != nil {
-		return keepWorkError(a.workDir, err)
+		return nil, keepWorkError(a.workDir, err)
 	}
 	publishJobPhaseProgress("processing", 0, "正在封装 MP4", 0, 0, 0)
 	if err := a.mux(outputPath, plan.AudioInput); err != nil {
-		return keepWorkError(a.workDir, err)
+		return nil, keepWorkError(a.workDir, err)
 	}
-	publishJobOutput(outputPath)
-	if !a.opts.keepWork {
-		if err := os.RemoveAll(a.workDir); err != nil {
-			fmt.Fprintln(consoleOut, "警告：无法清理工作目录：", err)
-		}
-	}
-	fmt.Fprintln(consoleOut, "完成：", outputPath)
-	return nil
+	return []MediaOutput{{Path: outputPath, Title: a.opts.title}}, nil
 }

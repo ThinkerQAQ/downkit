@@ -60,6 +60,7 @@ assert.equal(resolvedTask.resolvePage, true);
 assert.equal(resolvedTask.url, page.url);
 assert.deepEqual(resolvedTask.pageCookies, pageCookies);
 assert.equal(resolvedTask.playlist, "ask");
+assert.deepEqual(resolvedTask.subtitles, { mode: "none" });
 
 const playlistTask = launcher.buildTask(list[0], page, "best", [], pageCookies, "all");
 assert.equal(playlistTask.playlist, "all");
@@ -69,6 +70,13 @@ assert.equal(storedTask.cookieStoreId, "profile");
 assert.equal(storedTask.sourceTabId, 1);
 assert.equal(storedTask.sourceFrameId, 0);
 assert.equal(storedTask.pageUrl, page.url);
+
+const subtitleTask = launcher.buildTask(list[0], page, "best", [], pageCookies, "single", "profile", {
+  mode: "site", languages: ["zh.*", "zh.*"], includeAutomatic: true, format: "vtt"
+});
+assert.deepEqual(subtitleTask.subtitles, {
+  mode: "site", languages: ["zh.*"], includeAutomatic: true, format: "vtt"
+});
 
 const dashTask = launcher.buildTask({
   url: "https://cdn.test/manifest?id=42",

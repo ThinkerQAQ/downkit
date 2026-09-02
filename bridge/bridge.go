@@ -50,6 +50,7 @@ type bridgeTask struct {
 	SourceTabID   int               `json:"sourceTabId,omitempty"`
 	SourceFrameID int               `json:"sourceFrameId,omitempty"`
 	PageURL       string            `json:"pageUrl,omitempty"`
+	Subtitles     SubtitleRequest   `json:"subtitles,omitempty"`
 }
 
 type pendingBridgeTask struct {
@@ -305,6 +306,12 @@ func optionsFromBridgeTask(task bridgeTask, config bridgeConfig) (options, error
 		userAgent: task.UserAgent, proxy: config.Proxy, outputDir: config.OutputDir,
 		ffmpegPath: config.FFmpegPath, ytDLPPath: config.YTDLPPath,
 		playlistMode: task.Playlist, concurrent: config.Concurrent, resolvePage: task.ResolvePage,
+		pageURL: task.PageURL, subtitleRequest: task.Subtitles,
+	}
+	var err error
+	o.subtitleRequest, err = normalizeSubtitleRequest(o.subtitleRequest)
+	if err != nil {
+		return o, err
 	}
 	if o.userAgent == "" {
 		o.userAgent = defaultUA

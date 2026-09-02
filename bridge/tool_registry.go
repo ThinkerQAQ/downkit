@@ -226,15 +226,16 @@ type executableTool struct {
 	required, advanced                                                  bool
 	capabilities                                                        []string
 	sortOrder                                                           int
+	readConfiguredPath                                                  func(bridgeConfig) string
 }
 
 func (t executableTool) Name() string { return t.name }
 
 func (t executableTool) configuredPath(config bridgeConfig) string {
-	if t.configKey == "ffmpegPath" {
-		return config.FFmpegPath
+	if t.readConfiguredPath == nil {
+		return ""
 	}
-	return config.YTDLPPath
+	return t.readConfiguredPath(config)
 }
 
 func (t executableTool) Snapshot(ctx context.Context, config bridgeConfig) toolSnapshot {
@@ -289,11 +290,13 @@ func newDesktopToolRegistry() *toolRegistry {
 			name: "ffmpeg", displayName: "FFmpeg Slim", executableName: "ffmpeg", configKey: "ffmpegPath",
 			description: "无损封装 HLS、TS、fMP4 及分离音视频轨。", delivery: "bundled-sidecar",
 			capabilities: []string{"media.remux", "media.merge"}, sortOrder: 50, advanced: true,
+			readConfiguredPath: func(config bridgeConfig) string { return config.FFmpegPath },
 		},
 		executableTool{
 			name: "yt-dlp", displayName: "yt-dlp", executableName: "yt-dlp", configKey: "ytDlpPath",
 			description: "按需解析来源页面和通用媒体站点。", delivery: "on-demand", required: false,
-			capabilities: []string{"page.resolve", "playlist.resolve"}, sortOrder: 60, advanced: true,
+			capabilities: []string{"page.resolve", "playlist.resolve", "subtitle.source"}, sortOrder: 60, advanced: true,
+			readConfiguredPath: func(config bridgeConfig) string { return config.YTDLPPath },
 		},
 	)
 }

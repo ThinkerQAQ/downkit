@@ -137,7 +137,7 @@ async function restartBridge() {
   throw new Error(lastError && lastError.message || "Bridge 重启超时");
 }
 
-async function buildBridgeTask(resource, page, quality, playlist) {
+async function buildBridgeTask(resource, page, quality, playlist, subtitles) {
   const resolveFromPage = resource.kind === "resolved-media-page" || resource.kind === "dash";
   const mediaURL = resolveFromPage ? String(page && page.url || resource.url) : resource.url;
   const pageURL = String(page && page.url || "");
@@ -153,7 +153,8 @@ async function buildBridgeTask(resource, page, quality, playlist) {
     mediaCookies,
     pageCookies.length ? pageCookies : (resolveFromPage ? mediaCookies : []),
     playlist || "ask",
-    cookieStoreId
+    cookieStoreId,
+    subtitles
   );
 }
 
@@ -189,8 +190,8 @@ async function probeBridgePlaylist(resource, page, quality) {
   });
 }
 
-async function submitBridgeTask(resource, page, quality, playlist) {
-  const task = await buildBridgeTask(resource, page, quality, playlist || "single");
+async function submitBridgeTask(resource, page, quality, playlist, subtitles) {
+  const task = await buildBridgeTask(resource, page, quality, playlist || "single", subtitles);
   return bridgeFetch("/v1/tasks", {
     method: "POST",
     body: JSON.stringify(task)
@@ -530,7 +531,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "media.download") {
-    submitBridgeTask(message.resource, message.page, message.quality || "", message.playlist || "single")
+    submitBridgeTask(message.resource, message.page, message.quality || "", message.playlist || "single", message.subtitles)
       .then(result => sendResponse({ ok: true, taskId: result.taskId }), error => sendResponse({ ok: false, error: error.message || String(error) }));
     return true;
   }

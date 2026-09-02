@@ -43,7 +43,7 @@ func TestParseYTDLPOutputIncludesPlaylistIdentity(t *testing.T) {
 
 func TestYTDLPDownloadArgsForceProgressWithPrint(t *testing.T) {
 	a := app{opts: options{concurrent: 4}, workDir: t.TempDir()}
-	args := a.ytDLPDownloadArgs("https://example.com/video", "video.%(ext)s", "outputs.txt", false, ytDLPAttempt{})
+	args := a.ytDLPDownloadArgs("https://example.com/video", "video.%(ext)s", "outputs.txt", "subtitles.txt", false, ytDLPAttempt{})
 	if !slices.Contains(args, "--print") {
 		t.Fatal("test setup requires --print, which makes yt-dlp quiet")
 	}

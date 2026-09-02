@@ -9,7 +9,21 @@
     try { return new URL(pageURL).origin; } catch (_) { return ""; }
   }
 
-  function buildTask(resource, page, quality, mediaCookies, pageCookies, playlist, cookieStoreId) {
+  function normalizeSubtitleRequest(value) {
+    const request = value && typeof value === "object" ? value : {};
+    if (request.mode !== "site") return { mode: "none" };
+    const languages = Array.isArray(request.languages)
+      ? [...new Set(request.languages.map(item => String(item || "").trim()).filter(Boolean))].slice(0, 20)
+      : [];
+    return {
+      mode: "site",
+      languages: languages.length ? languages : ["all", "-live_chat"],
+      includeAutomatic: Boolean(request.includeAutomatic),
+      format: ["best", "srt", "vtt", "ass"].includes(request.format) ? request.format : "best"
+    };
+  }
+
+  function buildTask(resource, page, quality, mediaCookies, pageCookies, playlist, cookieStoreId, subtitles) {
     if (!resource || !resource.url) throw new Error("缺少媒体 URL");
     const resolveFromPage = resource.kind === "resolved-media-page" || resource.kind === "dash";
     const pageURL = String(page && page.url || "");
@@ -34,9 +48,10 @@
       cookieStoreId: String(cookieStoreId || ""),
       sourceTabId: Number.isInteger(resource.tabId) ? resource.tabId : -1,
       sourceFrameId: Number.isInteger(resource.frameId) ? resource.frameId : 0,
-      pageUrl: pageURL
+      pageUrl: pageURL,
+      subtitles: normalizeSubtitleRequest(subtitles)
     };
   }
 
-  return { buildTask };
+  return { buildTask, normalizeSubtitleRequest };
 });
