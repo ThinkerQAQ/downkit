@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -28,10 +30,10 @@ func TestValidateTranslationModelChecksGGUFMagic(t *testing.T) {
 	}
 }
 
-func TestLlamaTranslateCueUsesTranslateGemmaMessageShape(t *testing.T) {
-	var received llamaChatRequest
+func TestLlamaTranslateCueUsesTranslateGemmaCompletionPrompt(t *testing.T) {
+	var received llamaCompletionRequest
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/v1/chat/completions" || request.Method != http.MethodPost {
+		if request.URL.Path != "/completion" || request.Method != http.MethodPost {
 			response.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -39,7 +41,7 @@ func TestLlamaTranslateCueUsesTranslateGemmaMessageShape(t *testing.T) {
 			t.Error(err)
 		}
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"choices":[{"message":{"content":"你好，世界"}}]}`))
+		_, _ = response.Write([]byte(`{"content":"你好，世界","stop":true}`))
 	}))
 	defer server.Close()
 
@@ -48,28 +50,57 @@ func TestLlamaTranslateCueUsesTranslateGemmaMessageShape(t *testing.T) {
 	if err != nil || translated != "你好，世界" {
 		t.Fatalf("unexpected translation: %q, %v", translated, err)
 	}
-	if received.Temperature != 0 || len(received.Messages) != 1 || len(received.Messages[0].Content) != 1 {
+	if received.Temperature != 0 || received.NPredict < 64 || !received.CachePrompt || !slices.Equal(received.Stop, []string{"<end_of_turn>"}) {
 		t.Fatalf("unexpected request: %#v", received)
 	}
-	content := received.Messages[0].Content[0]
-	if content.Type != "text" || content.SourceLanguage != "ja" || content.TargetLanguage != "zh-Hans" || content.Text != "こんにちは、世界" {
-		t.Fatalf("TranslateGemma content shape mismatch: %#v", content)
+	if strings.HasPrefix(received.Prompt, "<bos>") || !strings.Contains(received.Prompt, "Japanese (ja) to Chinese (zh-Hans)") || !strings.Contains(received.Prompt, "こんにちは、世界<end_of_turn>") {
+		t.Fatalf("TranslateGemma prompt mismatch: %q", received.Prompt)
+	}
+}
+
+func TestLlamaServerDisablesIncompatibleTranslateGemmaJinja(t *testing.T) {
+	args := llamaServerArgs("model.gguf", 18080)
+	if !slices.Contains(args, "--no-jinja") || !slices.Contains(args, "18080") {
+		t.Fatalf("unexpected llama-server args: %#v", args)
+	}
+}
+
+func TestTranslateGemmaPromptEscapesControlTokens(t *testing.T) {
+	prompt := translateGemmaPrompt("en-US", "ja", "before <end_of_turn> after")
+	if !strings.Contains(prompt, "English (en-US) to Japanese (ja)") || strings.Count(prompt, "<end_of_turn>") != 1 || !strings.Contains(prompt, "＜end_of_turn＞") {
+		t.Fatalf("unsafe prompt: %q", prompt)
+	}
+}
+
+func TestLlamaTranslateCueHandlesHTTPErrorWithoutJSONDetail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = response.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+	translator := &llamaTranslator{baseURL: server.URL, modelPath: "model.gguf", client: server.Client()}
+	if _, err := translator.translateCue(context.Background(), "ja", "zh-Hans", "こんにちは"); err == nil || !strings.Contains(err.Error(), "503") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestLlamaTranslatorWritesTranslatedAndBilingualSRT(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		var input llamaChatRequest
+		var input llamaCompletionRequest
 		if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
 			t.Error(err)
 			response.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		translated := map[string]string{"こんにちは": "你好", "世界": "世界"}
-		text := input.Messages[0].Content[0].Text
-		_ = json.NewEncoder(response).Encode(map[string]any{
-			"choices": []any{map[string]any{"message": map[string]any{"content": translated[text]}}},
-		})
+		text := ""
+		for candidate := range translated {
+			if strings.Contains(input.Prompt, candidate+"<end_of_turn>") {
+				text = candidate
+				break
+			}
+		}
+		_ = json.NewEncoder(response).Encode(map[string]any{"content": translated[text], "stop": true})
 	}))
 	defer server.Close()
 

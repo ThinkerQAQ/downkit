@@ -35,32 +35,17 @@ type llamaTranslator struct {
 	serverLog   tailBuffer
 }
 
-type llamaChatRequest struct {
-	Model       string             `json:"model"`
-	Messages    []llamaChatMessage `json:"messages"`
-	Temperature float64            `json:"temperature"`
-	MaxTokens   int                `json:"max_tokens"`
+type llamaCompletionRequest struct {
+	Prompt      string   `json:"prompt"`
+	Temperature float64  `json:"temperature"`
+	NPredict    int      `json:"n_predict"`
+	Stop        []string `json:"stop"`
+	CachePrompt bool     `json:"cache_prompt"`
 }
 
-type llamaChatMessage struct {
-	Role    string             `json:"role"`
-	Content []translateContent `json:"content"`
-}
-
-type translateContent struct {
-	Type           string `json:"type"`
-	SourceLanguage string `json:"source_lang_code"`
-	TargetLanguage string `json:"target_lang_code"`
-	Text           string `json:"text"`
-}
-
-type llamaChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Error *struct {
+type llamaCompletionResponse struct {
+	Content string `json:"content"`
+	Error   *struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
 }
@@ -219,10 +204,7 @@ func (t *llamaTranslator) ensureServer(ctx context.Context) error {
 	_ = listener.Close()
 
 	t.serverLog.limit = 64 * 1024
-	command := exec.Command(serverPath,
-		"--model", t.modelPath, "--host", "127.0.0.1", "--port", strconv.Itoa(port),
-		"--ctx-size", "2048", "--parallel", "1", "--n-gpu-layers", "0", "--no-webui",
-	)
+	command := exec.Command(serverPath, llamaServerArgs(t.modelPath, port)...)
 	configureSidecarCommand(command)
 	command.Stdout = &t.serverLog
 	command.Stderr = &t.serverLog
@@ -244,6 +226,17 @@ func (t *llamaTranslator) ensureServer(ctx context.Context) error {
 	}
 	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=llama-translator operation=load-model status=ready durationMs=%d\n", time.Now().Format(time.RFC3339), time.Since(loadStarted).Milliseconds())
 	return nil
+}
+
+func llamaServerArgs(modelPath string, port int) []string {
+	return []string{
+		"--model", modelPath, "--host", "127.0.0.1", "--port", strconv.Itoa(port),
+		"--ctx-size", "2048", "--parallel", "1", "--n-gpu-layers", "0", "--no-webui",
+		// TranslateGemma's typed-content Jinja template cannot pass the
+		// automatic parser verification introduced in llama.cpp b7981.
+		// DownKit builds the equivalent text prompt and uses /completion.
+		"--no-jinja",
+	}
 }
 
 func completedTranslationCount(translations map[int]string, document SubtitleDocument) int {
@@ -316,18 +309,16 @@ func (t *llamaTranslator) translateCue(ctx context.Context, sourceLanguage, targ
 	if text == "" {
 		return "", errors.New("原字幕文本为空")
 	}
-	payload := llamaChatRequest{
-		Model: filepath.Base(t.modelPath), Temperature: 0,
-		MaxTokens: min(1024, max(64, len([]rune(text))*4+32)),
-		Messages: []llamaChatMessage{{Role: "user", Content: []translateContent{{
-			Type: "text", SourceLanguage: sourceLanguage, TargetLanguage: targetLanguage, Text: text,
-		}}}},
+	payload := llamaCompletionRequest{
+		Prompt: translateGemmaPrompt(sourceLanguage, targetLanguage, text), Temperature: 0,
+		NPredict: min(1024, max(64, len([]rune(text))*4+32)),
+		Stop:     []string{"<end_of_turn>"}, CachePrompt: true,
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, t.baseURL+"/v1/chat/completions", bytes.NewReader(encoded))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, t.baseURL+"/completion", bytes.NewReader(encoded))
 	if err != nil {
 		return "", err
 	}
@@ -341,21 +332,50 @@ func (t *llamaTranslator) translateCue(ctx context.Context, sourceLanguage, targ
 	if err != nil {
 		return "", err
 	}
-	var result llamaChatResponse
+	var result llamaCompletionResponse
 	if json.Unmarshal(data, &result) != nil {
 		return "", fmt.Errorf("llama-server 返回了无效 JSON（HTTP %d）", response.StatusCode)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		detail := strings.TrimSpace(result.Error.Message)
+		detail := ""
+		if result.Error != nil {
+			detail = strings.TrimSpace(result.Error.Message)
+		}
 		if detail == "" {
 			detail = http.StatusText(response.StatusCode)
 		}
 		return "", fmt.Errorf("llama-server HTTP %d：%s", response.StatusCode, detail)
 	}
-	if len(result.Choices) == 0 || strings.TrimSpace(result.Choices[0].Message.Content) == "" {
+	if strings.TrimSpace(result.Content) == "" {
 		return "", errors.New("llama-server 没有返回翻译文本")
 	}
-	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+	return strings.TrimSpace(result.Content), nil
+}
+
+func translateGemmaPrompt(sourceLanguage, targetLanguage, text string) string {
+	sourceName := translateGemmaLanguageName(sourceLanguage)
+	targetName := translateGemmaLanguageName(targetLanguage)
+	text = strings.ReplaceAll(text, "<start_of_turn>", "＜start_of_turn＞")
+	text = strings.ReplaceAll(text, "<end_of_turn>", "＜end_of_turn＞")
+	return fmt.Sprintf("<start_of_turn>user\n"+
+		"You are a professional %s (%s) to %s (%s) translator. Your goal is to accurately convey the meaning and nuances of the original %s text while adhering to %s grammar, vocabulary, and cultural sensitivities.\n"+
+		"Produce only the %s translation, without any additional explanations or commentary. Please translate the following %s text into %s:\n\n\n"+
+		"%s<end_of_turn>\n<start_of_turn>model\n",
+		sourceName, sourceLanguage, targetName, targetLanguage, sourceName, targetName,
+		targetName, sourceName, targetName, text)
+}
+
+func translateGemmaLanguageName(language string) string {
+	language = strings.TrimSpace(language)
+	base := strings.ToLower(strings.SplitN(language, "-", 2)[0])
+	names := map[string]string{
+		"zh": "Chinese", "yue": "Cantonese", "en": "English", "ja": "Japanese", "ko": "Korean",
+		"fr": "French", "de": "German", "es": "Spanish", "ru": "Russian", "pt": "Portuguese", "it": "Italian",
+	}
+	if name := names[base]; name != "" {
+		return name
+	}
+	return language
 }
 
 func translationSourceLanguage(language string) (string, error) {
