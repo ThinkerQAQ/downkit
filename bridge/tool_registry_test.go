@@ -35,6 +35,8 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	config.YTDLPPath = "custom-yt-dlp"
 	config.WhisperPath = "custom-whisper"
 	config.WhisperModel = "custom-model"
+	config.LlamaPath = "custom-llama"
+	config.TranslationModel = "custom-translation-model"
 	items := newDesktopToolRegistry().snapshots(context.Background(), config)
 	byName := make(map[string]toolSnapshot, len(items))
 	for _, item := range items {
@@ -85,6 +87,12 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	if len(byName["whisper.cpp"].Models) != 30 {
 		t.Fatalf("whisper model catalog size = %d", len(byName["whisper.cpp"].Models))
 	}
+	if byName["llama.cpp"].Config.Values["llamaPath"] != "custom-llama" || byName["llama.cpp"].Config.Values["translationModel"] != "custom-translation-model" {
+		t.Fatalf("llama config missing: %#v", byName["llama.cpp"].Config)
+	}
+	if len(byName["llama.cpp"].Models) != 1 || !byName["llama.cpp"].Models[0].RequiresLicenseAcceptance {
+		t.Fatalf("llama translation model catalog missing: %#v", byName["llama.cpp"].Models)
+	}
 	if len(byName["yt-dlp"].Actions) != 1 || byName["yt-dlp"].Actions[0].ID != "install" {
 		t.Fatalf("missing yt-dlp install action: %#v", byName["yt-dlp"].Actions)
 	}
@@ -94,7 +102,7 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	if byName["network-proxy"].Config.Toggle == nil || byName["network-proxy"].Config.Toggle.Key != "proxyEnabled" {
 		t.Fatalf("proxy toggle missing: %#v", byName["network-proxy"].Config)
 	}
-	wantKeys := map[string]bool{"address": true, "outputDir": true, "proxyHost": true, "proxyPort": true, "concurrent": true, "quality": true, "ffmpegPath": true, "ytDlpPath": true, "whisperPath": true, "whisperModel": true}
+	wantKeys := map[string]bool{"address": true, "outputDir": true, "proxyHost": true, "proxyPort": true, "concurrent": true, "quality": true, "ffmpegPath": true, "ytDlpPath": true, "whisperPath": true, "whisperModel": true, "llamaPath": true, "translationModel": true}
 	for _, item := range items {
 		for _, field := range item.Config.Schema {
 			if !wantKeys[field.Key] {

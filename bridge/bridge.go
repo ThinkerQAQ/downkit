@@ -165,6 +165,7 @@ func runBridge() error {
 	mux.HandleFunc("/v1/tools", server.handleTools)
 	mux.HandleFunc("/v1/tools/yt-dlp/install", server.handleInstallYTDLP)
 	mux.HandleFunc("/v1/tools/whisper/models/install", server.handleInstallWhisperModel)
+	mux.HandleFunc("/v1/tools/llama/models/install", server.handleInstallTranslationModel)
 	mux.HandleFunc("/v1/restart", server.handleRestart)
 	mux.HandleFunc("/v1/jobs", server.handleJobs)
 	mux.HandleFunc("/v1/jobs/", server.handleJobs)
@@ -314,6 +315,7 @@ func optionsFromBridgeTask(task bridgeTask, config bridgeConfig) (options, error
 		userAgent: task.UserAgent, proxy: config.Proxy, outputDir: config.OutputDir,
 		ffmpegPath: config.FFmpegPath, ytDLPPath: config.YTDLPPath,
 		whisperPath: config.WhisperPath, whisperModel: config.WhisperModel,
+		llamaPath: config.LlamaPath, translationModel: config.TranslationModel,
 		playlistMode: task.Playlist, concurrent: config.Concurrent, resolvePage: task.ResolvePage,
 		pageURL: task.PageURL, subtitleRequest: task.Subtitles,
 	}

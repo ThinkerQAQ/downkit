@@ -56,7 +56,7 @@
         <option value="pt">葡萄牙语</option>
         <option value="it">意大利语</option>
       </select>
-      <span id="asrLanguageHint" hidden>这是视频里说的语言，不是翻译目标语言；当前本地识别生成原语言 SRT。</span>
+      <span id="asrLanguageHint" hidden>这是视频里说的语言，不是翻译目标语言；需要翻译时请明确选择。</span>
       <label id="subtitleTargetLanguageLabel" for="subtitleTargetLanguage" hidden>输出语言</label>
       <select id="subtitleTargetLanguage" hidden>
         <option value="">保持原语言</option>
@@ -66,7 +66,7 @@
         <option value="ja">日语</option>
         <option value="ko">韩语</option>
       </select>
-      <span id="subtitleTargetLanguageHint" hidden>选择其他语言时会进行本地翻译；翻译组件将在下一阶段提供。</span>
+      <span id="subtitleTargetLanguageHint" hidden>选择其他语言时会使用“工具与配置”中的 llama.cpp 在本机翻译。</span>
       <label id="subtitleLayoutLabel" for="subtitleLayout" hidden>字幕形式</label>
       <select id="subtitleLayout" hidden>
         <option value="translated">仅译文</option>

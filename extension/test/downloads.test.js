@@ -20,9 +20,12 @@ assert.deepEqual(downloads.selectedSubtitleRequest(controls({ subtitleMode: "asr
 assert.deepEqual(downloads.selectedSubtitleRequest(controls({
   subtitleMode: "site-or-asr", asrLanguage: "ja", subtitleTargetLanguage: "zh-Hans", subtitleLayout: "bilingual"
 })), {
-  mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best",
+  mode: "site-or-asr", languages: ["ja.*", "ja"], includeAutomatic: true, format: "best",
   asrLanguage: "ja", targetLanguage: "zh-Hans", bilingual: true
 });
+assert.throws(() => downloads.selectedSubtitleRequest(controls({
+  subtitleMode: "asr", asrLanguage: "auto", subtitleTargetLanguage: "zh-Hans"
+})), /明确选择视频语音/);
 
 const visibilityElements = {
   subtitleMode: { value: "asr" },

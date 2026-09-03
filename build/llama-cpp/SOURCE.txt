@@ -1,0 +1,10 @@
+Component: llama.cpp Windows x64 CPU server
+Upstream: https://github.com/ggml-org/llama.cpp
+Release: b10621 (llama.cpp 0.3.0-dev, commit c1d0e7a00)
+Asset: llama-b10621-bin-win-cpu-x64.zip
+URL: https://github.com/ggml-org/llama.cpp/releases/download/b10621/llama-b10621-bin-win-cpu-x64.zip
+SHA-256: 0e8b65e650e369f70f8307d890508886f171ef4fb00facccddd4a1b7ffdaca51
+License: MIT; bundled LLVM OpenMP runtime retains its upstream license.
+
+DownKit copies llama-server.exe and the CPU runtime libraries from the official
+archive. Translation model weights are not included.

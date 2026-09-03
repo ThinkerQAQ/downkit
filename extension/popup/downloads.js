@@ -102,7 +102,13 @@
         request = { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
         break;
       case "site-or-asr":
-        request = { mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage };
+        request = {
+          mode: "site-or-asr",
+          languages: asrLanguage === "auto" ? ["all", "-live_chat"] : [`${asrLanguage}.*`, asrLanguage],
+          includeAutomatic: true,
+          format: "best",
+          asrLanguage
+        };
         break;
       case "asr":
         request = { mode: "asr", includeAutomatic: false, format: "srt", asrLanguage };
@@ -113,6 +119,9 @@
     const targetSelect = controls.getElementById("subtitleTargetLanguage");
     const targetLanguage = String(targetSelect && targetSelect.value || "").trim();
     if (targetLanguage) {
+      if (["site-or-asr", "asr"].includes(request.mode) && request.asrLanguage === "auto") {
+        throw new Error("翻译字幕时，请明确选择视频语音，不能使用自动检测");
+      }
       const layoutSelect = controls.getElementById("subtitleLayout");
       request.targetLanguage = targetLanguage;
       request.bilingual = Boolean(layoutSelect && layoutSelect.value === "bilingual");

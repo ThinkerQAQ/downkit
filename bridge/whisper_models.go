@@ -26,15 +26,18 @@ type whisperModelDescriptor struct {
 }
 
 type whisperModelView struct {
-	ID          string `json:"id"`
-	SizeBytes   int64  `json:"sizeBytes"`
-	Language    string `json:"language"`
-	Variant     string `json:"variant"`
-	Recommended bool   `json:"recommended,omitempty"`
-	Installed   bool   `json:"installed"`
-	Active      bool   `json:"active"`
-	Path        string `json:"path,omitempty"`
-	Source      string `json:"source"`
+	ID                        string `json:"id"`
+	SizeBytes                 int64  `json:"sizeBytes"`
+	Language                  string `json:"language"`
+	Variant                   string `json:"variant"`
+	Recommended               bool   `json:"recommended,omitempty"`
+	Installed                 bool   `json:"installed"`
+	Active                    bool   `json:"active"`
+	Path                      string `json:"path,omitempty"`
+	Source                    string `json:"source"`
+	License                   string `json:"license,omitempty"`
+	LicenseURL                string `json:"licenseUrl,omitempty"`
+	RequiresLicenseAcceptance bool   `json:"requiresLicenseAcceptance,omitempty"`
 }
 
 func whisperModel(id string, size int64, checksum string) whisperModelDescriptor {

@@ -106,6 +106,9 @@ func normalizeSubtitleRequest(request SubtitleRequest) (SubtitleRequest, error) 
 	if request.Bilingual && request.TargetLanguage == "" {
 		return request, errors.New("双语字幕必须同时选择输出语言")
 	}
+	if request.TargetLanguage != "" && request.needsASR() && request.ASRLanguage == "auto" {
+		return request, errors.New("本地识别后翻译字幕时，请明确选择视频语音，不能使用自动检测")
+	}
 	return request, nil
 }
 
@@ -163,9 +166,11 @@ type ASREngine interface {
 	Transcribe(context.Context, MediaOutput, string) (SubtitleArtifact, error)
 }
 
-// Translator is the future boundary for llama.cpp or another local model.
+// Translator keeps model-specific process and prompt details outside the
+// source/ASR orchestration layer. Close releases any job-scoped sidecar.
 type Translator interface {
 	Translate(context.Context, SubtitleArtifact, string, bool) (SubtitleArtifact, error)
+	Close() error
 }
 
 type defaultSubtitlePipeline struct {
@@ -186,27 +191,63 @@ func (p *defaultSubtitlePipeline) Process(ctx context.Context, request SubtitleR
 	if !request.enabled() {
 		return existing, nil
 	}
+	var sources []SubtitleArtifact
 	if request.Mode == "site" {
 		if len(existing) > 0 || sourceSubtitleAttemptComplete(media) {
-			return existing, nil
+			sources = existing
+		} else {
+			var err error
+			sources, err = p.app.downloadSiteSubtitles(ctx, request, media)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return p.app.downloadSiteSubtitles(ctx, request, media)
-	}
-	if request.Mode == "site-or-asr" {
+	} else if request.Mode == "site-or-asr" {
 		if len(existing) > 0 {
-			return existing, nil
-		}
-		if !sourceSubtitleAttemptComplete(media) {
+			sources = existing
+		} else if !sourceSubtitleAttemptComplete(media) {
 			artifacts, err := p.app.downloadSiteSubtitles(ctx, request, media)
 			if err == nil && len(artifacts) > 0 {
-				return artifacts, nil
+				sources = artifacts
 			}
 			if err != nil {
 				fmt.Fprintln(consoleErr, "警告：原站字幕获取失败，继续使用本地语音识别：", err)
 			}
 		}
+		if len(sources) == 0 {
+			var err error
+			sources, err = p.transcribeMedia(ctx, request, media)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		var err error
+		sources, err = p.transcribeMedia(ctx, request, media)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return p.transcribeMedia(ctx, request, media)
+	if !request.needsTranslation() {
+		return sources, nil
+	}
+	if len(sources) == 0 {
+		return nil, errors.New("没有可供翻译的原语言字幕")
+	}
+	defer func() {
+		if err := p.translator.Close(); err != nil {
+			fmt.Fprintln(consoleErr, "警告：无法完整停止本地翻译服务：", err)
+		}
+	}()
+	results := append([]SubtitleArtifact(nil), sources...)
+	for _, source := range sources {
+		translated, err := p.translator.Translate(ctx, source, request.TargetLanguage, request.Bilingual)
+		if err != nil {
+			return nil, err
+		}
+		results = appendUniqueSubtitleArtifacts(results, translated)
+	}
+	return results, nil
 }
 
 func (p *defaultSubtitlePipeline) transcribeMedia(ctx context.Context, request SubtitleRequest, media []MediaOutput) ([]SubtitleArtifact, error) {

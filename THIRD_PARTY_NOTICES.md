@@ -27,6 +27,12 @@ Windows desktop release packages include the separate CPU build of `whisper-cli`
 
 Upstream project and licensing information: <https://github.com/ggml-org/whisper.cpp>
 
+## llama.cpp
+
+Windows desktop release packages include the separate CPU build of `llama-server` and its runtime libraries from llama.cpp. llama.cpp is licensed under the MIT License; the bundled LLVM OpenMP runtime retains its upstream license. Translation model files are not bundled by DownKit and retain their own terms, including the Gemma license where applicable.
+
+Upstream project and licensing information: <https://github.com/ggml-org/llama.cpp>
+
 ## golang.org/x/mobile
 
 The Android bridge uses `golang.org/x/mobile`, licensed under the BSD 3-Clause License.

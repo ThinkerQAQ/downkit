@@ -15,17 +15,19 @@ import (
 const bridgeVersion = "1.0.8"
 
 type bridgeConfig struct {
-	OutputDir    string `json:"outputDir"`
-	Proxy        string `json:"proxy,omitempty"`
-	ProxyEnabled *bool  `json:"proxyEnabled,omitempty"`
-	ProxyHost    string `json:"proxyHost"`
-	ProxyPort    int    `json:"proxyPort"`
-	Concurrent   int    `json:"concurrent"`
-	Quality      string `json:"quality"`
-	FFmpegPath   string `json:"ffmpegPath"`
-	YTDLPPath    string `json:"ytDlpPath"`
-	WhisperPath  string `json:"whisperPath"`
-	WhisperModel string `json:"whisperModel"`
+	OutputDir        string `json:"outputDir"`
+	Proxy            string `json:"proxy,omitempty"`
+	ProxyEnabled     *bool  `json:"proxyEnabled,omitempty"`
+	ProxyHost        string `json:"proxyHost"`
+	ProxyPort        int    `json:"proxyPort"`
+	Concurrent       int    `json:"concurrent"`
+	Quality          string `json:"quality"`
+	FFmpegPath       string `json:"ffmpegPath"`
+	YTDLPPath        string `json:"ytDlpPath"`
+	WhisperPath      string `json:"whisperPath"`
+	WhisperModel     string `json:"whisperModel"`
+	LlamaPath        string `json:"llamaPath"`
+	TranslationModel string `json:"translationModel"`
 }
 
 type bridgeToolStatus struct {
@@ -89,6 +91,8 @@ func normalizeBridgeConfig(config bridgeConfig) (bridgeConfig, error) {
 	config.YTDLPPath = strings.TrimSpace(config.YTDLPPath)
 	config.WhisperPath = strings.TrimSpace(config.WhisperPath)
 	config.WhisperModel = strings.TrimSpace(config.WhisperModel)
+	config.LlamaPath = strings.TrimSpace(config.LlamaPath)
+	config.TranslationModel = strings.TrimSpace(config.TranslationModel)
 	if config.OutputDir == "" {
 		return config, errors.New("下载目录不能为空")
 	}

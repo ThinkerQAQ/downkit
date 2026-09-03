@@ -57,7 +57,10 @@ assert.match(backgroundSource, /key: "detectDash"/);
 assert.match(backgroundSource, /key: "detectMp4"/);
 assert.match(backgroundSource, /MEDIA_SNIFFER_CONFIG_KEY/);
 assert.match(backgroundSource, /v1\/tools\/whisper\/models\/install/);
+assert.match(backgroundSource, /v1\/tools\/llama\/models\/install/);
 assert.match(backgroundSource, /model: String\(message\.model/);
+assert.match(environmentSource, /requiresLicenseAcceptance/);
+assert.match(environmentSource, /acceptLicense: requiresAcceptance/);
 assert.match(environmentSource, /field\.type === "boolean"/);
 assert.match(environmentSource, /tool\.config\.scope === "extension"/);
 

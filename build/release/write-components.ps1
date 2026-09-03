@@ -38,6 +38,8 @@ function Artifacts([string]$relativeDirectory) {
 $ffmpegName = if ($Platform -eq 'windows') { 'tools\ffmpeg-slim.exe' } else { 'tools/ffmpeg-slim' }
 $whisperName = if ($Platform -eq 'windows') { 'tools\whisper\whisper-cli.exe' } else { 'tools/whisper/whisper-cli' }
 $whisperArtifact = Artifact $whisperName
+$llamaName = if ($Platform -eq 'windows') { 'tools\llama\llama-server.exe' } else { 'tools/llama/llama-server' }
+$llamaArtifact = Artifact $llamaName
 $manifest = [ordered]@{
     schemaVersion = 1
     productVersion = $versionMatch.Groups[1].Value
@@ -74,6 +76,17 @@ $manifest = [ordered]@{
             license = 'MIT'
             licenseFile = 'tools/whisper/LICENSE'
             sourceFile = 'tools/whisper/SOURCE.txt'
+        },
+        [ordered]@{
+            id = 'llama.cpp'
+            displayName = 'llama.cpp'
+            delivery = if ($llamaArtifact) { 'bundled-sidecar' } else { 'external' }
+            requiredFor = @('subtitle.translate')
+            artifact = $llamaArtifact
+            bundleArtifacts = @(Artifacts 'tools\llama')
+            license = 'MIT'
+            licenseFile = 'tools/llama/LICENSE'
+            sourceFile = 'tools/llama/SOURCE.txt'
         }
     )
 }

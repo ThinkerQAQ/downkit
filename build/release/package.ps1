@@ -126,6 +126,11 @@ try {
                 throw 'Whisper Client is missing. Run .\build\whisper-cpp\install-windows.ps1 before packaging.'
             }
             Copy-Item -LiteralPath $whisperDir -Destination $toolsDir -Recurse
+            $llamaDir = Join-Path $projectRoot 'dist\tools\llama'
+            if (-not (Test-Path -LiteralPath (Join-Path $llamaDir 'llama-server.exe'))) {
+                throw 'llama-server is missing. Run .\build\llama-cpp\install-windows.ps1 before packaging.'
+            }
+            Copy-Item -LiteralPath $llamaDir -Destination $toolsDir -Recurse
             & (Join-Path $projectRoot 'build\release\write-components.ps1') -DistDir $packageDir -Platform windows -Architecture $architecture
         } elseif ($platform -eq 'linux') {
             Copy-Item -LiteralPath (Join-Path $projectRoot 'Install-Linux.sh') -Destination $packageDir

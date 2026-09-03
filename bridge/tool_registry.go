@@ -287,6 +287,61 @@ func (whisperTool) Snapshot(ctx context.Context, config bridgeConfig) toolSnapsh
 	}
 }
 
+type llamaTool struct{}
+
+func (llamaTool) Name() string { return "llama.cpp" }
+
+func (llamaTool) Snapshot(ctx context.Context, config bridgeConfig) toolSnapshot {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	delivery := "external"
+	if runtime.GOOS == "windows" {
+		delivery = "bundled-sidecar"
+	}
+	path, pathErr := findTool(config.LlamaPath, "llama-server")
+	health := toolHealth{Status: "missing", OK: false, Summary: "llama-server 未找到", CheckedAt: time.Now()}
+	if pathErr != nil {
+		health.Detail = pathErr.Error()
+		if runtime.GOOS == "windows" {
+			health.Summary = "翻译组件尚未安装"
+			health.Detail = "llama-server 将放在 DownKit tools/llama 目录；也可以在下方指定可信程序。"
+		}
+	} else {
+		health.Path = path
+		output, err := exec.CommandContext(ctx, path, "--version").CombinedOutput()
+		if err != nil {
+			health.Status = "error"
+			health.Summary = "llama-server 无法运行"
+			health.Detail = strings.TrimSpace(string(output))
+		} else if modelErr := validateTranslationModel(config.TranslationModel); modelErr != nil {
+			health.Summary = "翻译模型未配置"
+			health.Detail = modelErr.Error()
+		} else {
+			model, _ := os.Stat(config.TranslationModel)
+			health.Status = "ready"
+			health.OK = true
+			health.Summary = "本地字幕翻译就绪"
+			health.Version = strings.TrimSpace(strings.SplitN(string(output), "\n", 2)[0])
+			health.Detail = fmt.Sprintf("模型 %s · %.1f GiB", filepath.Base(config.TranslationModel), float64(model.Size())/(1<<30))
+		}
+	}
+	return toolSnapshot{
+		Name: "llama.cpp", DisplayName: "llama.cpp", Kind: "dependency",
+		Description: "在本机运行 TranslateGemma，将原语言字幕翻译为目标语言。",
+		Platforms:   []string{"windows", "linux", "darwin"}, Delivery: delivery, Required: false,
+		Capabilities: []string{"subtitle.translate"}, SortOrder: 80,
+		Models: translationModelViews(config),
+		Config: toolConfigView{
+			Schema: []toolConfigField{
+				{Key: "llamaPath", Label: "llama-server 程序路径", Type: "file", Advanced: true, Placeholder: "llama-server.exe 的完整路径", Description: "可留空并从 PATH 或 DownKit tools/llama 目录自动查找。"},
+				{Key: "translationModel", Label: "翻译 GGUF 模型路径", Type: "file", Placeholder: "例如 translategemma-4b-Q4_K_M.gguf", Description: "当前建议使用 TranslateGemma 4B Q4_K_M；模型许可需由用户自行确认。"},
+			},
+			Values: map[string]any{"llamaPath": config.LlamaPath, "translationModel": config.TranslationModel},
+		},
+		Health: health,
+	}
+}
+
 func (t executableTool) Name() string { return t.name }
 
 func (t executableTool) configuredPath(config bridgeConfig) string {
@@ -357,6 +412,7 @@ func newDesktopToolRegistry() *toolRegistry {
 			readConfiguredPath: func(config bridgeConfig) string { return config.YTDLPPath },
 		},
 		whisperTool{},
+		llamaTool{},
 	)
 }
 

@@ -14,6 +14,24 @@ type recordingASREngine struct {
 	called bool
 }
 
+type recordingTranslator struct {
+	called bool
+	closed bool
+}
+
+func (t *recordingTranslator) Translate(_ context.Context, artifact SubtitleArtifact, target string, bilingual bool) (SubtitleArtifact, error) {
+	t.called = true
+	artifact.Path += ".translated.srt"
+	artifact.Language = target
+	artifact.Source = "translation"
+	return artifact, nil
+}
+
+func (t *recordingTranslator) Close() error {
+	t.closed = true
+	return nil
+}
+
 func (e *recordingASREngine) Transcribe(_ context.Context, media MediaOutput, language string) (SubtitleArtifact, error) {
 	e.called = true
 	return SubtitleArtifact{Path: media.Path + ".srt", MediaPath: media.Path, Language: language, Format: "srt", Source: "asr"}, nil
@@ -54,6 +72,9 @@ func TestNormalizeSubtitleRequest(t *testing.T) {
 	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "none", TargetLanguage: "zh-Hans"}); err == nil {
 		t.Fatal("translation without a subtitle source was accepted")
 	}
+	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "site-or-asr", ASRLanguage: "auto", TargetLanguage: "zh-Hans"}); err == nil {
+		t.Fatal("translation with automatic fallback ASR language was accepted")
+	}
 }
 
 func TestSubtitlePipelineRejectsTranslationWithoutTranslator(t *testing.T) {
@@ -83,6 +104,22 @@ func TestSubtitlePipelinePrefersExistingSiteArtifact(t *testing.T) {
 	artifacts, err := pipeline.Process(context.Background(), SubtitleRequest{Mode: "site-or-asr", ASRLanguage: "auto"}, media)
 	if err != nil || engine.called || len(artifacts) != 1 || artifacts[0].Source != "site" {
 		t.Fatalf("site subtitle was not preferred: artifacts=%#v called=%v err=%v", artifacts, engine.called, err)
+	}
+}
+
+func TestSubtitlePipelineTranslatesAcquiredArtifact(t *testing.T) {
+	engine := &recordingASREngine{}
+	translator := &recordingTranslator{}
+	pipeline := newSubtitlePipeline(&app{}, engine, translator)
+	media := []MediaOutput{{Path: "video.mp4", SubtitleAttempted: true}}
+	artifacts, err := pipeline.Process(context.Background(), SubtitleRequest{
+		Mode: "site-or-asr", ASRLanguage: "ja", TargetLanguage: "zh-Hans", Bilingual: true,
+	}, media)
+	if err != nil || !engine.called || !translator.called || !translator.closed || len(artifacts) != 2 {
+		t.Fatalf("translation pipeline failed: artifacts=%#v engine=%v translator=%#v err=%v", artifacts, engine.called, translator, err)
+	}
+	if artifacts[0].Source != "asr" || artifacts[1].Source != "translation" || artifacts[1].Language != "zh-Hans" {
+		t.Fatalf("unexpected translated artifacts: %#v", artifacts)
 	}
 }
 

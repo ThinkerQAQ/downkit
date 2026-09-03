@@ -111,6 +111,7 @@ h1 span { margin-left: 4px; color: #9db4b2; font-size: 9px; font-weight: 600; }
 .model-manager strong, .model-manager small { grid-column: 1 / -1; }
 .model-manager select { min-width: 0; height: 29px; }
 .model-manager small { color: var(--muted); line-height: 1.4; }
+.model-manager a { grid-column: 1 / -1; color: var(--accent); font-size: 9px; }
 
 .actions, .inline-actions { display: flex; gap: 6px; }
 button { min-height: 27px; padding: 4px 8px; border: 0; border-radius: 4px; font-size: 10px; }

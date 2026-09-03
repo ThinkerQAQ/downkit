@@ -164,7 +164,8 @@
     const manager = document.createElement("div");
     manager.className = "model-manager";
     const title = document.createElement("strong");
-    title.textContent = "Whisper 模型目录";
+    const toolName = tool.displayName || tool.name || "本地";
+    title.textContent = `${toolName} 模型目录`;
     const select = document.createElement("select");
     select.setAttribute("aria-label", "选择 Whisper 模型");
     for (const model of models) {
@@ -176,6 +177,10 @@
     const initial = models.find(model => model.active) || models.find(model => model.recommended) || models[0];
     select.value = initial.id;
     const detail = document.createElement("small");
+    const licenseLink = document.createElement("a");
+    licenseLink.target = "_blank";
+    licenseLink.rel = "noreferrer";
+    licenseLink.hidden = true;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "primary";
@@ -186,19 +191,26 @@
     function update() {
       const model = selectedModel();
       detail.textContent = `${model.source} · ${model.language} · ${model.variant} · ${formatModelSize(model.sizeBytes)}`;
+      licenseLink.hidden = !model.licenseUrl;
+      licenseLink.href = model.licenseUrl || "#";
+      licenseLink.textContent = model.license ? `查看 ${model.license} 使用条款` : "查看模型许可";
       button.textContent = modelActionLabel(model);
       button.disabled = Boolean(model.active);
     }
     select.addEventListener("change", update);
     button.addEventListener("click", async () => {
       const model = selectedModel();
-      if (!model.installed && root.confirm && !root.confirm(`下载 ${model.id}（${formatModelSize(model.sizeBytes)}）并设为当前模型？`)) return;
+      const requiresAcceptance = !model.installed && Boolean(model.requiresLicenseAcceptance);
+      const confirmation = requiresAcceptance
+        ? `该模型受 ${model.license || "单独"} 使用条款约束。请先点击条款链接阅读。\n\n确认你已阅读并接受条款，并下载 ${model.id}（${formatModelSize(model.sizeBytes)}）？`
+        : `下载 ${model.id}（${formatModelSize(model.sizeBytes)}）并设为当前模型？`;
+      if (!model.installed && root.confirm && !root.confirm(confirmation)) return;
       button.disabled = true;
       button.textContent = model.installed ? "正在切换…" : "正在下载…";
-      api.setMessage("environmentMessage", `正在准备 Whisper 模型 ${model.id}，请勿关闭扩展弹窗…`);
+      api.setMessage("environmentMessage", `正在准备 ${toolName} 模型 ${model.id}，请勿关闭扩展弹窗…`);
       try {
-        await api.send("bridge.tool.action", { tool: tool.name, toolAction: "install-model", model: model.id });
-        api.setMessage("environmentMessage", `Whisper 模型 ${model.id} 已可用并设为当前模型。`, "ok");
+        await api.send("bridge.tool.action", { tool: tool.name, toolAction: "install-model", model: model.id, acceptLicense: requiresAcceptance });
+        api.setMessage("environmentMessage", `${toolName} 模型 ${model.id} 已可用并设为当前模型。`, "ok");
         await refresh();
       } catch (error) {
         api.setMessage("environmentMessage", error.message || String(error), "error");
@@ -206,7 +218,7 @@
         update();
       }
     });
-    manager.append(title, select, detail, button);
+    manager.append(title, select, button, detail, licenseLink);
     body.appendChild(manager);
     update();
   }

@@ -220,6 +220,8 @@ func TestBridgeTaskCarriesSubtitleRequest(t *testing.T) {
 	config := defaultBridgeConfig()
 	config.WhisperPath = "whisper-custom"
 	config.WhisperModel = "model-custom"
+	config.LlamaPath = "llama-custom"
+	config.TranslationModel = "translation-model-custom"
 	opts, err := optionsFromBridgeTask(bridgeTask{
 		URL: "https://media.test/master.m3u8", Title: "test", PageURL: "https://page.test/watch",
 		Subtitles: SubtitleRequest{Mode: "site", Languages: []string{"zh.*", "zh.*"}, IncludeAutomatic: true},
@@ -227,7 +229,7 @@ func TestBridgeTaskCarriesSubtitleRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opts.pageURL != "https://page.test/watch" || !opts.subtitleRequest.enabled() || len(opts.subtitleRequest.Languages) != 1 || opts.subtitleRequest.Format != "best" || opts.whisperPath != "whisper-custom" || opts.whisperModel != "model-custom" {
+	if opts.pageURL != "https://page.test/watch" || !opts.subtitleRequest.enabled() || len(opts.subtitleRequest.Languages) != 1 || opts.subtitleRequest.Format != "best" || opts.whisperPath != "whisper-custom" || opts.whisperModel != "model-custom" || opts.llamaPath != "llama-custom" || opts.translationModel != "translation-model-custom" {
 		t.Fatalf("subtitle request was not normalized: page=%q request=%#v", opts.pageURL, opts.subtitleRequest)
 	}
 }

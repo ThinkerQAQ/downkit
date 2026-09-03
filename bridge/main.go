@@ -49,6 +49,8 @@ type options struct {
 	ytDLPPath          string
 	whisperPath        string
 	whisperModel       string
+	llamaPath          string
+	translationModel   string
 	playlistMode       string
 	quality            int
 	qualitySet         bool
@@ -231,6 +233,13 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 			return err
 		}
 	}
+	if opts.subtitleRequest.needsTranslation() {
+		tools["llama-server"] = &opts.llamaPath
+		tools["ffmpeg"] = &opts.ffmpegPath
+		if err := validateTranslationModel(opts.translationModel); err != nil {
+			return err
+		}
+	}
 	for name, value := range tools {
 		path, err := findTool(*value, name)
 		if err != nil {
@@ -279,7 +288,11 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	if opts.subtitleRequest.needsASR() {
 		asr = newWhisperASREngine(opts.whisperPath, opts.whisperModel, opts.ffmpegPath, workDir, opts.keepWork)
 	}
-	a.subtitlePipeline = newSubtitlePipeline(a, asr, nil)
+	var translator Translator
+	if opts.subtitleRequest.needsTranslation() {
+		translator = newLlamaTranslator(opts.llamaPath, opts.translationModel, opts.ffmpegPath, workDir)
+	}
+	a.subtitlePipeline = newSubtitlePipeline(a, asr, translator)
 	if a.muxer == nil && !directMP4 {
 		a.muxer = ffmpegMuxer{path: opts.ffmpegPath, stdout: os.Stdout, stderr: os.Stderr}
 	}
@@ -473,6 +486,8 @@ func parseOptions() (options, error) {
 	flag.StringVar(&o.ytDLPPath, "yt-dlp", "", "yt-dlp 路径")
 	flag.StringVar(&o.whisperPath, "whisper", "", "whisper-cli 路径")
 	flag.StringVar(&o.whisperModel, "whisper-model", "", "whisper.cpp GGML 模型路径")
+	flag.StringVar(&o.llamaPath, "llama-server", "", "llama-server 路径")
+	flag.StringVar(&o.translationModel, "translation-model", "", "字幕翻译 GGUF 模型路径")
 	flag.StringVar(&o.playlistMode, "playlist", "ask", "页面播放列表模式：ask、single 或 all")
 	flag.StringVar(&qualityArg, "quality", "", "best 或目标高度，例如 720；省略时交互选择")
 	flag.IntVar(&o.limit, "limit", 0, "仅下载前 N 个分片，用于测试")
@@ -766,7 +781,8 @@ func toolExecutableNames(name string) []string {
 }
 
 var bundledToolSubdirectories = map[string]string{
-	"whisper-cli": "whisper",
+	"whisper-cli":  "whisper",
+	"llama-server": "llama",
 }
 
 func toolInstallDirectories(root, name string) []string {
