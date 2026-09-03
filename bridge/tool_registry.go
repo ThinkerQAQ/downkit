@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -55,18 +57,19 @@ type toolHealth struct {
 }
 
 type toolSnapshot struct {
-	Name         string         `json:"name"`
-	DisplayName  string         `json:"displayName"`
-	Kind         string         `json:"kind"`
-	Description  string         `json:"description,omitempty"`
-	Platforms    []string       `json:"platforms"`
-	Delivery     string         `json:"delivery"`
-	Required     bool           `json:"required"`
-	Capabilities []string       `json:"capabilities,omitempty"`
-	Actions      []toolAction   `json:"actions,omitempty"`
-	Config       toolConfigView `json:"config"`
-	Health       toolHealth     `json:"health"`
-	SortOrder    int            `json:"sortOrder"`
+	Name         string             `json:"name"`
+	DisplayName  string             `json:"displayName"`
+	Kind         string             `json:"kind"`
+	Description  string             `json:"description,omitempty"`
+	Platforms    []string           `json:"platforms"`
+	Delivery     string             `json:"delivery"`
+	Required     bool               `json:"required"`
+	Capabilities []string           `json:"capabilities,omitempty"`
+	Actions      []toolAction       `json:"actions,omitempty"`
+	Models       []whisperModelView `json:"models,omitempty"`
+	Config       toolConfigView     `json:"config"`
+	Health       toolHealth         `json:"health"`
+	SortOrder    int                `json:"sortOrder"`
 }
 
 type toolAction struct {
@@ -229,6 +232,61 @@ type executableTool struct {
 	readConfiguredPath                                                  func(bridgeConfig) string
 }
 
+type whisperTool struct{}
+
+func (whisperTool) Name() string { return "whisper.cpp" }
+
+func (whisperTool) Snapshot(ctx context.Context, config bridgeConfig) toolSnapshot {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	delivery := "external"
+	if runtime.GOOS == "windows" {
+		delivery = "bundled-sidecar"
+	}
+	path, pathErr := findTool(config.WhisperPath, "whisper-cli")
+	health := toolHealth{Status: "missing", OK: false, Summary: "whisper-cli 未找到", CheckedAt: time.Now()}
+	if pathErr != nil {
+		health.Detail = pathErr.Error()
+		if runtime.GOOS == "windows" {
+			health.Summary = "随包组件缺失"
+			health.Detail = "whisper.cpp 客户端应由 Windows 安装包提供；请修复或重新安装 DownKit，也可在下方指定可信的 whisper-cli 程序。"
+		}
+	} else {
+		health.Path = path
+		output, err := exec.CommandContext(ctx, path, "-h").CombinedOutput()
+		if err != nil {
+			health.Status = "error"
+			health.Summary = "whisper-cli 无法运行"
+			health.Detail = strings.TrimSpace(string(output))
+		} else if modelErr := validateWhisperModel(config.WhisperModel); modelErr != nil {
+			health.Summary = "模型未配置"
+			health.Detail = modelErr.Error()
+		} else {
+			model, _ := os.Stat(config.WhisperModel)
+			health.Status = "ready"
+			health.OK = true
+			health.Summary = "本地语音识别就绪"
+			health.Version = "whisper.cpp"
+			health.Detail = fmt.Sprintf("模型 %s · %.0f MiB", filepath.Base(config.WhisperModel), float64(model.Size())/(1<<20))
+		}
+	}
+	return toolSnapshot{
+		Name: "whisper.cpp", DisplayName: "whisper.cpp", Kind: "dependency",
+		Description: "原站没有字幕时，在本机离线识别音频并生成 SRT。Windows 客户端随包提供，模型需由用户显式选择。",
+		Platforms:   []string{"windows", "linux", "darwin"}, Delivery: delivery, Required: false,
+		Capabilities: []string{"subtitle.asr", "audio.transcribe"}, SortOrder: 70,
+		Models: whisperModelViews(config),
+		Config: toolConfigView{
+			Schema: []toolConfigField{
+				{Key: "whisperPath", Label: "whisper-cli 程序路径", Type: "file", Advanced: true, Placeholder: "whisper-cli.exe 的完整路径", Description: "可留空并从 PATH 或 DownKit tools 目录自动查找。"},
+				{Key: "whisperModel", Label: "GGML 模型路径", Type: "file", Placeholder: "例如 ggml-small.bin", Description: "中文或多语言识别请勿选择名称以 .en 结尾的英语专用模型。"},
+			},
+			Values: map[string]any{"whisperPath": config.WhisperPath, "whisperModel": config.WhisperModel},
+		},
+		Health: health,
+	}
+}
+
 func (t executableTool) Name() string { return t.name }
 
 func (t executableTool) configuredPath(config bridgeConfig) string {
@@ -298,6 +356,7 @@ func newDesktopToolRegistry() *toolRegistry {
 			capabilities: []string{"page.resolve", "playlist.resolve", "subtitle.source"}, sortOrder: 60, advanced: true,
 			readConfiguredPath: func(config bridgeConfig) string { return config.YTDLPPath },
 		},
+		whisperTool{},
 	)
 }
 

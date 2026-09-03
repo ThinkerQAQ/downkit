@@ -121,6 +121,11 @@ try {
             Copy-Item -LiteralPath (Join-Path $projectRoot 'dist\tools\COPYING.LGPLv2.1') -Destination $toolsDir
             Copy-Item -LiteralPath (Join-Path $projectRoot 'dist\tools\ffmpeg-slim-SOURCE.txt') -Destination $toolsDir
             Copy-Item -LiteralPath (Join-Path $projectRoot 'build\ffmpeg-slim\build-windows.ps1') -Destination (Join-Path $toolsDir 'ffmpeg-slim-BUILD.ps1')
+            $whisperDir = Join-Path $projectRoot 'dist\tools\whisper'
+            if (-not (Test-Path -LiteralPath (Join-Path $whisperDir 'whisper-cli.exe'))) {
+                throw 'Whisper Client is missing. Run .\build\whisper-cpp\install-windows.ps1 before packaging.'
+            }
+            Copy-Item -LiteralPath $whisperDir -Destination $toolsDir -Recurse
             & (Join-Path $projectRoot 'build\release\write-components.ps1') -DistDir $packageDir -Platform windows -Architecture $architecture
         } elseif ($platform -eq 'linux') {
             Copy-Item -LiteralPath (Join-Path $projectRoot 'Install-Linux.sh') -Destination $packageDir

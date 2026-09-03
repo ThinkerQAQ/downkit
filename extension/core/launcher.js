@@ -11,15 +11,17 @@
 
   function normalizeSubtitleRequest(value) {
     const request = value && typeof value === "object" ? value : {};
-    if (request.mode !== "site") return { mode: "none" };
+    const modes = new Set(["site", "asr", "site-or-asr"]);
+    if (!modes.has(request.mode)) return { mode: "none" };
     const languages = Array.isArray(request.languages)
       ? [...new Set(request.languages.map(item => String(item || "").trim()).filter(Boolean))].slice(0, 20)
       : [];
     return {
-      mode: "site",
-      languages: languages.length ? languages : ["all", "-live_chat"],
+      mode: request.mode,
+      ...(["site", "site-or-asr"].includes(request.mode) ? { languages: languages.length ? languages : ["all", "-live_chat"] } : {}),
       includeAutomatic: Boolean(request.includeAutomatic),
-      format: ["best", "srt", "vtt", "ass"].includes(request.format) ? request.format : "best"
+      format: ["best", "srt", "vtt", "ass"].includes(request.format) ? request.format : "best",
+      ...(["asr", "site-or-asr"].includes(request.mode) ? { asrLanguage: String(request.asrLanguage || "auto").trim().toLowerCase() || "auto" } : {})
     };
   }
 

@@ -78,6 +78,13 @@ assert.deepEqual(subtitleTask.subtitles, {
   mode: "site", languages: ["zh.*"], includeAutomatic: true, format: "vtt"
 });
 
+const asrTask = launcher.buildTask(list[0], page, "best", [], pageCookies, "single", "profile", {
+  mode: "site-or-asr", languages: [], includeAutomatic: true
+});
+assert.deepEqual(asrTask.subtitles, {
+  mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage: "auto"
+});
+
 const dashTask = launcher.buildTask({
   url: "https://cdn.test/manifest?id=42",
   kind: "dash"

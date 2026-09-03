@@ -572,6 +572,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .then(result => sendResponse(result), error => sendResponse({ ok: false, error: error.message || String(error) }));
       return true;
     }
+    if (tool === "whisper.cpp" && action === "install-model") {
+      bridgeFetch("/v1/tools/whisper/models/install", {
+        method: "POST",
+        body: JSON.stringify({ model: String(message.model || "") })
+      }).then(result => sendResponse(result), error => sendResponse({ ok: false, error: error.message || String(error) }));
+      return true;
+    }
     if (tool !== "yt-dlp" || action !== "install") {
       sendResponse({ ok: false, error: "不支持的 Tool 操作" });
       return;

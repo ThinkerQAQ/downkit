@@ -25,7 +25,19 @@ function Artifact([string]$relativePath) {
     }
 }
 
+function Artifacts([string]$relativeDirectory) {
+    $directory = Join-Path $DistDir $relativeDirectory
+    if (-not (Test-Path -LiteralPath $directory)) { return @() }
+    return @(
+        Get-ChildItem -LiteralPath $directory -File |
+            Sort-Object Name |
+            ForEach-Object { Artifact (Join-Path $relativeDirectory $_.Name) }
+    )
+}
+
 $ffmpegName = if ($Platform -eq 'windows') { 'tools\ffmpeg-slim.exe' } else { 'tools/ffmpeg-slim' }
+$whisperName = if ($Platform -eq 'windows') { 'tools\whisper\whisper-cli.exe' } else { 'tools/whisper/whisper-cli' }
+$whisperArtifact = Artifact $whisperName
 $manifest = [ordered]@{
     schemaVersion = 1
     productVersion = $versionMatch.Groups[1].Value
@@ -51,6 +63,17 @@ $manifest = [ordered]@{
             releaseBaseUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download'
             checksumAsset = 'SHA2-256SUMS'
             licenseUrl = 'https://github.com/yt-dlp/yt-dlp/blob/master/README.md#licensing'
+        },
+        [ordered]@{
+            id = 'whisper.cpp'
+            displayName = 'whisper.cpp'
+            delivery = if ($whisperArtifact) { 'bundled-sidecar' } else { 'external' }
+            requiredFor = @('subtitle.asr', 'audio.transcribe')
+            artifact = $whisperArtifact
+            bundleArtifacts = @(Artifacts 'tools\whisper')
+            license = 'MIT'
+            licenseFile = 'tools/whisper/LICENSE'
+            sourceFile = 'tools/whisper/SOURCE.txt'
         }
     )
 }

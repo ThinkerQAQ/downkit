@@ -76,7 +76,7 @@ $outputUnix = Convert-ToMSYSPath $OutputDir
 $buildUnix = Convert-ToMSYSPath $buildRoot
 $scriptUnix = Convert-ToMSYSPath (Join-Path $PSScriptRoot 'build-native.sh')
 
-& $bash -lc "export PATH=/ucrt64/bin:/usr/bin; bash '$scriptUnix' '$sourceUnix' '$buildUnix/native' '$outputUnix'"
+& $bash -lc "export PATH=/ucrt64/bin:/usr/bin; bash '$scriptUnix' '$sourceUnix' '$buildUnix/native' '$outputUnix' '$FFmpegTag'"
 if ($LASTEXITCODE -ne 0) {
     throw "FFmpeg Slim build failed: $LASTEXITCODE"
 }

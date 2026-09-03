@@ -47,6 +47,8 @@ type options struct {
 	outputDir          string
 	ffmpegPath         string
 	ytDLPPath          string
+	whisperPath        string
+	whisperModel       string
 	playlistMode       string
 	quality            int
 	qualitySet         bool
@@ -219,8 +221,15 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	} else if !directMP4 && platformMuxer == nil {
 		tools["ffmpeg"] = &opts.ffmpegPath
 	}
-	if opts.subtitleRequest.enabled() {
+	if opts.subtitleRequest.usesSiteSubtitles() {
 		tools["yt-dlp"] = &opts.ytDLPPath
+	}
+	if opts.subtitleRequest.requiresASRBeforeDownload() {
+		tools["ffmpeg"] = &opts.ffmpegPath
+		tools["whisper-cli"] = &opts.whisperPath
+		if err := validateWhisperModel(opts.whisperModel); err != nil {
+			return err
+		}
 	}
 	for name, value := range tools {
 		path, err := findTool(*value, name)
@@ -231,6 +240,11 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	}
 	if opts.ffmpegPath != "" {
 		if err := validateFFmpegVersion(opts.ffmpegPath); err != nil {
+			return err
+		}
+	}
+	if opts.subtitleRequest.needsASR() {
+		if err := validateFFmpegASRSupport(opts.ffmpegPath); err != nil {
 			return err
 		}
 	}
@@ -261,7 +275,11 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 		muxer:         platformMuxer,
 		mediaSession:  newMediaHTTPSession(opts),
 	}
-	a.subtitlePipeline = newSubtitlePipeline(a, nil, nil)
+	var asr ASREngine
+	if opts.subtitleRequest.needsASR() {
+		asr = newWhisperASREngine(opts.whisperPath, opts.whisperModel, opts.ffmpegPath, workDir, opts.keepWork)
+	}
+	a.subtitlePipeline = newSubtitlePipeline(a, asr, nil)
 	if a.muxer == nil && !directMP4 {
 		a.muxer = ffmpegMuxer{path: opts.ffmpegPath, stdout: os.Stdout, stderr: os.Stderr}
 	}
@@ -453,6 +471,8 @@ func parseOptions() (options, error) {
 	flag.StringVar(&o.outputDir, "output-dir", defaultOutput, "输出目录")
 	flag.StringVar(&o.ffmpegPath, "ffmpeg", "", "ffmpeg 路径")
 	flag.StringVar(&o.ytDLPPath, "yt-dlp", "", "yt-dlp 路径")
+	flag.StringVar(&o.whisperPath, "whisper", "", "whisper-cli 路径")
+	flag.StringVar(&o.whisperModel, "whisper-model", "", "whisper.cpp GGML 模型路径")
 	flag.StringVar(&o.playlistMode, "playlist", "ask", "页面播放列表模式：ask、single 或 all")
 	flag.StringVar(&qualityArg, "quality", "", "best 或目标高度，例如 720；省略时交互选择")
 	flag.IntVar(&o.limit, "limit", 0, "仅下载前 N 个分片，用于测试")
@@ -745,6 +765,18 @@ func toolExecutableNames(name string) []string {
 	return []string{slimName, toolName}
 }
 
+var bundledToolSubdirectories = map[string]string{
+	"whisper-cli": "whisper",
+}
+
+func toolInstallDirectories(root, name string) []string {
+	directories := make([]string, 0, 2)
+	if subdirectory := bundledToolSubdirectories[name]; subdirectory != "" {
+		directories = append(directories, filepath.Join(root, subdirectory))
+	}
+	return append(directories, root)
+}
+
 func findTool(preferred, name string) (string, error) {
 	if preferred != "" {
 		if _, err := os.Stat(preferred); err == nil {
@@ -755,8 +787,10 @@ func findTool(preferred, name string) (string, error) {
 	toolNames := toolExecutableNames(name)
 	if executable, err := os.Executable(); err == nil {
 		executableDir := filepath.Dir(executable)
-		candidates := make([]string, 0, len(toolNames)*2)
-		for _, toolDir := range []string{filepath.Join(executableDir, "tools"), executableDir} {
+		toolDirectories := toolInstallDirectories(filepath.Join(executableDir, "tools"), name)
+		toolDirectories = append(toolDirectories, executableDir)
+		candidates := make([]string, 0, len(toolNames)*len(toolDirectories))
+		for _, toolDir := range toolDirectories {
 			for _, candidateName := range toolNames {
 				candidates = append(candidates, filepath.Join(toolDir, candidateName))
 			}
@@ -768,10 +802,12 @@ func findTool(preferred, name string) (string, error) {
 		}
 	}
 	if configTools, err := bridgeDataPath("tools"); err == nil {
-		for _, candidateName := range toolNames {
-			candidate := filepath.Join(configTools, candidateName)
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				return candidate, nil
+		for _, toolDir := range toolInstallDirectories(configTools, name) {
+			for _, candidateName := range toolNames {
+				candidate := filepath.Join(toolDir, candidateName)
+				if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+					return candidate, nil
+				}
 			}
 		}
 	}
@@ -992,7 +1028,9 @@ func (a *app) downloadResolvedPage(pageURL string) ([]MediaOutput, error) {
 	var lastErr error
 	outputRecord := filepath.Join(a.workDir, "yt-dlp-outputs.txt")
 	subtitleRecord := filepath.Join(a.workDir, "yt-dlp-subtitles.txt")
-	_ = os.Remove(outputRecord)
+	if previous, err := a.recordedMediaOutputs(outputRecord); err == nil {
+		fmt.Fprintf(consoleOut, "恢复检查点：发现 %d 个已下载页面媒体产物。\n", len(previous))
+	}
 	_ = os.Remove(subtitleRecord)
 	publishJobPhaseProgress("resolving", 100, "解析完成", 0, 0, 0)
 	publishJobPhaseProgress("downloading", 0, "准备下载页面媒体", 0, 0, 0)
@@ -1240,7 +1278,7 @@ func (a *app) ytDLPDownloadArgs(pageURL, outputTemplate, outputRecord, subtitleR
 		"--print", "after_move:downkit-output:%(playlist_index)s|%(id)s|%(filepath)s",
 		"--print-to-file", "after_move:downkit-output:%(playlist_index)s|%(id)s|%(filepath)s", strings.ReplaceAll(outputRecord, "%", "%%"),
 	}
-	if a.opts.subtitleRequest.enabled() {
+	if a.opts.subtitleRequest.usesSiteSubtitles() {
 		args = append(args,
 			"--write-subs", "--sub-langs", strings.Join(a.opts.subtitleRequest.Languages, ","),
 			"--sub-format", a.opts.subtitleRequest.Format,
@@ -1280,6 +1318,10 @@ func (a *app) recordedMediaOutputs(record string) ([]MediaOutput, error) {
 			path = filepath.Join(a.opts.outputDir, filepath.FromSlash(path))
 		}
 		path = filepath.Clean(path)
+		info, statErr := os.Stat(path)
+		if statErr != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+			continue
+		}
 		key := strings.ToLower(path)
 		if seen[key] {
 			continue

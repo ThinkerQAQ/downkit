@@ -21,6 +21,12 @@ yt-dlp is an optional external tool. DownKit does not bundle it in standard rele
 
 Upstream project and licensing information: <https://github.com/yt-dlp/yt-dlp>
 
+## whisper.cpp
+
+Windows desktop release packages include the separate CPU build of `whisper-cli` and its runtime libraries from whisper.cpp. The client is licensed under the MIT License. Speech-recognition model files are not bundled by DownKit and retain the terms published by their respective distributors.
+
+Upstream project and licensing information: <https://github.com/ggml-org/whisper.cpp>
+
 ## golang.org/x/mobile
 
 The Android bridge uses `golang.org/x/mobile`, licensed under the BSD 3-Clause License.

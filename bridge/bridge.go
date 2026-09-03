@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -163,6 +164,7 @@ func runBridge() error {
 	mux.HandleFunc("/v1/config", server.handleConfig)
 	mux.HandleFunc("/v1/tools", server.handleTools)
 	mux.HandleFunc("/v1/tools/yt-dlp/install", server.handleInstallYTDLP)
+	mux.HandleFunc("/v1/tools/whisper/models/install", server.handleInstallWhisperModel)
 	mux.HandleFunc("/v1/restart", server.handleRestart)
 	mux.HandleFunc("/v1/jobs", server.handleJobs)
 	mux.HandleFunc("/v1/jobs/", server.handleJobs)
@@ -182,10 +184,16 @@ func runBridge() error {
 		default:
 		}
 	}
+	listener, err := net.Listen("tcp", bridgeAddress)
+	if err != nil {
+		return fmt.Errorf("Bridge 监听 %s 失败：%w", bridgeAddress, err)
+	}
 	if err := writeBridgeState(server.state); err != nil {
+		_ = listener.Close()
 		return err
 	}
-	err = httpServer.ListenAndServe()
+	fmt.Fprintf(os.Stderr, "Bridge 已就绪：pid=%d address=%s\n", server.state.PID, bridgeAddress)
+	err = httpServer.Serve(listener)
 	select {
 	case <-restartRequested:
 		command, commandErr := bridgeCommand()
@@ -305,6 +313,7 @@ func optionsFromBridgeTask(task bridgeTask, config bridgeConfig) (options, error
 		sourceURL: task.URL, title: task.Title, referer: task.Referer, origin: task.Origin,
 		userAgent: task.UserAgent, proxy: config.Proxy, outputDir: config.OutputDir,
 		ffmpegPath: config.FFmpegPath, ytDLPPath: config.YTDLPPath,
+		whisperPath: config.WhisperPath, whisperModel: config.WhisperModel,
 		playlistMode: task.Playlist, concurrent: config.Concurrent, resolvePage: task.ResolvePage,
 		pageURL: task.PageURL, subtitleRequest: task.Subtitles,
 	}

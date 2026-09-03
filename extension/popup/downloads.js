@@ -94,6 +94,10 @@
         return { mode: "site", languages: ["en.*"], includeAutomatic: true, format: "best" };
       case "site-all":
         return { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
+      case "site-or-asr":
+        return { mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage: "auto" };
+      case "asr":
+        return { mode: "asr", includeAutomatic: false, format: "srt", asrLanguage: "auto" };
       default:
         return { mode: "none" };
     }

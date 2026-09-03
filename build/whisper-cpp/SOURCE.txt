@@ -1,0 +1,12 @@
+whisper.cpp Windows x64 CPU client
+
+Upstream project: https://github.com/ggml-org/whisper.cpp
+Release tag: b4938 (whisper.cpp 1.9.3)
+Commit: 371b5a7
+Asset: whisper-bin-x64.zip
+Asset URL: https://github.com/ggml-org/whisper.cpp/releases/download/b4938/whisper-bin-x64.zip
+Asset SHA-256: c2a4b60edb11f7e11a9191ffb50929535527d4d91c9903dbe3e554583bbbc63d
+
+DownKit copies whisper-cli.exe, whisper.dll, ggml.dll, ggml-base.dll, and all
+ggml-cpu-*.dll runtime backends from the official asset. The model is not part
+of this bundle.

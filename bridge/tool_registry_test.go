@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,8 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	config := defaultBridgeConfig()
 	config.FFmpegPath = "custom-ffmpeg"
 	config.YTDLPPath = "custom-yt-dlp"
+	config.WhisperPath = "custom-whisper"
+	config.WhisperModel = "custom-model"
 	items := newDesktopToolRegistry().snapshots(context.Background(), config)
 	byName := make(map[string]toolSnapshot, len(items))
 	for _, item := range items {
@@ -73,6 +76,15 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	if byName["yt-dlp"].Delivery != "on-demand" {
 		t.Fatalf("yt-dlp delivery = %q", byName["yt-dlp"].Delivery)
 	}
+	if byName["whisper.cpp"].Config.Values["whisperPath"] != "custom-whisper" || byName["whisper.cpp"].Config.Values["whisperModel"] != "custom-model" {
+		t.Fatalf("whisper config missing: %#v", byName["whisper.cpp"].Config)
+	}
+	if runtime.GOOS == "windows" && byName["whisper.cpp"].Delivery != "bundled-sidecar" {
+		t.Fatalf("whisper delivery = %q", byName["whisper.cpp"].Delivery)
+	}
+	if len(byName["whisper.cpp"].Models) != 30 {
+		t.Fatalf("whisper model catalog size = %d", len(byName["whisper.cpp"].Models))
+	}
 	if len(byName["yt-dlp"].Actions) != 1 || byName["yt-dlp"].Actions[0].ID != "install" {
 		t.Fatalf("missing yt-dlp install action: %#v", byName["yt-dlp"].Actions)
 	}
@@ -82,7 +94,7 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	if byName["network-proxy"].Config.Toggle == nil || byName["network-proxy"].Config.Toggle.Key != "proxyEnabled" {
 		t.Fatalf("proxy toggle missing: %#v", byName["network-proxy"].Config)
 	}
-	wantKeys := map[string]bool{"address": true, "outputDir": true, "proxyHost": true, "proxyPort": true, "concurrent": true, "quality": true, "ffmpegPath": true, "ytDlpPath": true}
+	wantKeys := map[string]bool{"address": true, "outputDir": true, "proxyHost": true, "proxyPort": true, "concurrent": true, "quality": true, "ffmpegPath": true, "ytDlpPath": true, "whisperPath": true, "whisperModel": true}
 	for _, item := range items {
 		for _, field := range item.Config.Schema {
 			if !wantKeys[field.Key] {

@@ -3,12 +3,14 @@
 DownKit 的桌面发布包保留独立 sidecar，不把第三方可执行文件嵌入主程序：
 
 - `tools/ffmpeg-slim[.exe]` 随标准发布包提供；
+- Windows 包在 `tools/whisper/` 中提供官方 CPU 版 `whisper-cli.exe` 及其运行时 DLL；模型文件不随包提供；
 - `yt-dlp` 是可选 Tool，缺失时由桌面端在用户点击后从官方 release 下载；
 - `components.json` 记录交付方式、能力、随包文件 SHA-256 和许可证/源码信息；按需下载组件不记录本地开发目录中的同名文件。
 
 Windows 发布目录准备好后运行：
 
 ```powershell
+.\build\whisper-cpp\install-windows.ps1
 .\build\release\write-components.ps1
 ```
 

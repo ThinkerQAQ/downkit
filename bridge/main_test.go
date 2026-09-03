@@ -217,14 +217,17 @@ func TestBridgeTaskCarriesStructuredCookiesOutsideHeaders(t *testing.T) {
 }
 
 func TestBridgeTaskCarriesSubtitleRequest(t *testing.T) {
+	config := defaultBridgeConfig()
+	config.WhisperPath = "whisper-custom"
+	config.WhisperModel = "model-custom"
 	opts, err := optionsFromBridgeTask(bridgeTask{
 		URL: "https://media.test/master.m3u8", Title: "test", PageURL: "https://page.test/watch",
 		Subtitles: SubtitleRequest{Mode: "site", Languages: []string{"zh.*", "zh.*"}, IncludeAutomatic: true},
-	}, defaultBridgeConfig())
+	}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opts.pageURL != "https://page.test/watch" || !opts.subtitleRequest.enabled() || len(opts.subtitleRequest.Languages) != 1 || opts.subtitleRequest.Format != "best" {
+	if opts.pageURL != "https://page.test/watch" || !opts.subtitleRequest.enabled() || len(opts.subtitleRequest.Languages) != 1 || opts.subtitleRequest.Format != "best" || opts.whisperPath != "whisper-custom" || opts.whisperModel != "model-custom" {
 		t.Fatalf("subtitle request was not normalized: page=%q request=%#v", opts.pageURL, opts.subtitleRequest)
 	}
 }
@@ -265,6 +268,46 @@ func TestToolExecutableNamesPreferSlimFFmpeg(t *testing.T) {
 	ytDLP := toolExecutableNames("yt-dlp")
 	if len(ytDLP) != 1 || !strings.HasPrefix(ytDLP[0], "yt-dlp") {
 		t.Fatalf("unexpected yt-dlp candidates: %#v", ytDLP)
+	}
+}
+
+func TestRecordedMediaOutputsKeepsExistingRetryCheckpoint(t *testing.T) {
+	root := t.TempDir()
+	mediaPath := filepath.Join(root, "lesson.mp4")
+	if err := os.WriteFile(mediaPath, []byte("media"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(root, "yt-dlp-outputs.txt")
+	record := "downkit-output:1|lesson|" + mediaPath + "\n" +
+		"downkit-output:2|missing|" + filepath.Join(root, "missing.mp4") + "\n"
+	if err := os.WriteFile(recordPath, []byte(record), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	application := &app{opts: options{outputDir: root}}
+	outputs, err := application.recordedMediaOutputs(recordPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outputs) != 1 || outputs[0].Path != mediaPath || outputs[0].ItemID != "lesson" {
+		t.Fatalf("unexpected checkpoint outputs: %#v", outputs)
+	}
+	if err := os.Remove(mediaPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := application.recordedMediaOutputs(recordPath); err == nil {
+		t.Fatal("expected stale checkpoint without existing media to be rejected")
+	}
+}
+
+func TestToolInstallDirectoriesPreferBundledWhisperDirectory(t *testing.T) {
+	root := filepath.Join("release", "tools")
+	directories := toolInstallDirectories(root, "whisper-cli")
+	if len(directories) != 2 || directories[0] != filepath.Join(root, "whisper") || directories[1] != root {
+		t.Fatalf("unexpected whisper directories: %#v", directories)
+	}
+	plain := toolInstallDirectories(root, "yt-dlp")
+	if len(plain) != 1 || plain[0] != root {
+		t.Fatalf("unexpected yt-dlp directories: %#v", plain)
 	}
 }
 

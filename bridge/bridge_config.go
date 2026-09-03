@@ -24,6 +24,8 @@ type bridgeConfig struct {
 	Quality      string `json:"quality"`
 	FFmpegPath   string `json:"ffmpegPath"`
 	YTDLPPath    string `json:"ytDlpPath"`
+	WhisperPath  string `json:"whisperPath"`
+	WhisperModel string `json:"whisperModel"`
 }
 
 type bridgeToolStatus struct {
@@ -85,6 +87,8 @@ func normalizeBridgeConfig(config bridgeConfig) (bridgeConfig, error) {
 	config.Quality = strings.ToLower(strings.TrimSpace(config.Quality))
 	config.FFmpegPath = strings.TrimSpace(config.FFmpegPath)
 	config.YTDLPPath = strings.TrimSpace(config.YTDLPPath)
+	config.WhisperPath = strings.TrimSpace(config.WhisperPath)
+	config.WhisperModel = strings.TrimSpace(config.WhisperModel)
 	if config.OutputDir == "" {
 		return config, errors.New("下载目录不能为空")
 	}

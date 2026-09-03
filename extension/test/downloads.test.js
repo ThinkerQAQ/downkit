@@ -10,6 +10,9 @@ assert.deepEqual(downloads.selectedSubtitleRequest({ getElementById: () => ({ va
   mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best"
 });
 assert.deepEqual(downloads.selectedSubtitleRequest({ getElementById: () => null }), { mode: "none" });
+assert.deepEqual(downloads.selectedSubtitleRequest({ getElementById: () => ({ value: "asr" }) }), {
+  mode: "asr", includeAutomatic: false, format: "srt", asrLanguage: "auto"
+});
 
 const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../popup/downloads.js"), "utf8");
 assert.match(source, /activateTab\("jobs"\)/);

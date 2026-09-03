@@ -142,6 +142,75 @@
     return value === undefined || value === null || value === "" ? "未设置" : String(value);
   }
 
+  function formatModelSize(value) {
+    const bytes = Number(value) || 0;
+    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
+    return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MiB`;
+  }
+
+  function modelOptionLabel(model) {
+    const state = model.active ? "当前" : model.installed ? "已下载" : model.recommended ? "推荐" : "";
+    return [model.id, model.language, model.variant, formatModelSize(model.sizeBytes), state].filter(Boolean).join(" · ");
+  }
+
+  function modelActionLabel(model) {
+    if (model.active) return "当前模型";
+    return model.installed ? "设为当前模型" : "下载并使用";
+  }
+
+  function renderModelManager(body, tool) {
+    const models = Array.isArray(tool.models) ? tool.models : [];
+    if (!models.length) return;
+    const manager = document.createElement("div");
+    manager.className = "model-manager";
+    const title = document.createElement("strong");
+    title.textContent = "Whisper 模型目录";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "选择 Whisper 模型");
+    for (const model of models) {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = modelOptionLabel(model);
+      select.appendChild(option);
+    }
+    const initial = models.find(model => model.active) || models.find(model => model.recommended) || models[0];
+    select.value = initial.id;
+    const detail = document.createElement("small");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "primary";
+
+    function selectedModel() {
+      return models.find(model => model.id === select.value) || models[0];
+    }
+    function update() {
+      const model = selectedModel();
+      detail.textContent = `${model.source} · ${model.language} · ${model.variant} · ${formatModelSize(model.sizeBytes)}`;
+      button.textContent = modelActionLabel(model);
+      button.disabled = Boolean(model.active);
+    }
+    select.addEventListener("change", update);
+    button.addEventListener("click", async () => {
+      const model = selectedModel();
+      if (!model.installed && root.confirm && !root.confirm(`下载 ${model.id}（${formatModelSize(model.sizeBytes)}）并设为当前模型？`)) return;
+      button.disabled = true;
+      button.textContent = model.installed ? "正在切换…" : "正在下载…";
+      api.setMessage("environmentMessage", `正在准备 Whisper 模型 ${model.id}，请勿关闭扩展弹窗…`);
+      try {
+        await api.send("bridge.tool.action", { tool: tool.name, toolAction: "install-model", model: model.id });
+        api.setMessage("environmentMessage", `Whisper 模型 ${model.id} 已可用并设为当前模型。`, "ok");
+        await refresh();
+      } catch (error) {
+        api.setMessage("environmentMessage", error.message || String(error), "error");
+        button.disabled = false;
+        update();
+      }
+    });
+    manager.append(title, select, detail, button);
+    body.appendChild(manager);
+    update();
+  }
+
   function editorValue(tool, field) {
     const config = tool && tool.config || {};
     const configured = config.values && config.values[field.key];
@@ -336,6 +405,7 @@
         body.appendChild(detail);
       }
 
+      renderModelManager(body, tool);
       if (editing) renderConfigEditor(body, tool);
       else renderConfigView(body, tool);
       const actions = Array.isArray(tool.actions) ? tool.actions : [];
@@ -404,6 +474,6 @@
   root.DownKitEnvironment = { init, activate: refresh, renderTools };
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { cardState, normalizedKind, visibleConfigFields, editorValue, toggleMetadata };
+    module.exports = { cardState, normalizedKind, visibleConfigFields, editorValue, toggleMetadata, formatModelSize, modelOptionLabel, modelActionLabel };
   }
 })(globalThis);

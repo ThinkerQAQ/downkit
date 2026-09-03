@@ -13,18 +13,33 @@ import (
 
 const ytDLPSubtitleRecordPrefix = "downkit-subtitle:"
 
-// SubtitleRequest is part of the Bridge task protocol. Phase one supports
-// source-site subtitles only; the shape leaves ASR and translation policy out
-// of the transport until those engines are actually available.
+// SubtitleRequest is part of the Bridge task protocol. Source-site and local
+// ASR modes stay explicit so selecting a subtitle never silently starts a
+// compute-heavy transcription job.
 type SubtitleRequest struct {
 	Mode             string   `json:"mode,omitempty"`
 	Languages        []string `json:"languages,omitempty"`
 	IncludeAutomatic bool     `json:"includeAutomatic,omitempty"`
 	Format           string   `json:"format,omitempty"`
+	ASRLanguage      string   `json:"asrLanguage,omitempty"`
 }
 
 func (r SubtitleRequest) enabled() bool {
-	return strings.EqualFold(strings.TrimSpace(r.Mode), "site")
+	return strings.ToLower(strings.TrimSpace(r.Mode)) != "none" && strings.TrimSpace(r.Mode) != ""
+}
+
+func (r SubtitleRequest) usesSiteSubtitles() bool {
+	mode := strings.ToLower(strings.TrimSpace(r.Mode))
+	return mode == "site" || mode == "site-or-asr"
+}
+
+func (r SubtitleRequest) needsASR() bool {
+	mode := strings.ToLower(strings.TrimSpace(r.Mode))
+	return mode == "asr" || mode == "site-or-asr"
+}
+
+func (r SubtitleRequest) requiresASRBeforeDownload() bool {
+	return strings.EqualFold(strings.TrimSpace(r.Mode), "asr")
 }
 
 func normalizeSubtitleRequest(request SubtitleRequest) (SubtitleRequest, error) {
@@ -32,8 +47,8 @@ func normalizeSubtitleRequest(request SubtitleRequest) (SubtitleRequest, error) 
 	if request.Mode == "" {
 		request.Mode = "none"
 	}
-	if request.Mode != "none" && request.Mode != "site" {
-		return request, errors.New("字幕模式必须是 none 或 site")
+	if request.Mode != "none" && request.Mode != "site" && request.Mode != "asr" && request.Mode != "site-or-asr" {
+		return request, errors.New("字幕模式必须是 none、site、asr 或 site-or-asr")
 	}
 	request.Format = strings.ToLower(strings.TrimSpace(request.Format))
 	if request.Format == "" {
@@ -64,20 +79,43 @@ func normalizeSubtitleRequest(request SubtitleRequest) (SubtitleRequest, error) 
 			return request, errors.New("字幕语言不能超过 20 项")
 		}
 	}
-	if request.Mode == "site" && len(languages) == 0 {
+	if request.usesSiteSubtitles() && len(languages) == 0 {
 		languages = []string{"all", "-live_chat"}
 	}
 	request.Languages = languages
+	request.ASRLanguage = strings.ToLower(strings.TrimSpace(request.ASRLanguage))
+	if request.needsASR() && request.ASRLanguage == "" {
+		request.ASRLanguage = "auto"
+	}
+	if request.ASRLanguage != "" && !validASRLanguage(request.ASRLanguage) {
+		return request, errors.New("ASR 语言必须是 auto 或有效的语言代码")
+	}
 	return request, nil
 }
 
-// SubtitlePipeline coordinates subtitle acquisition and, later, ASR and
-// translation. The first implementation only acquires source-site subtitles.
+func validASRLanguage(language string) bool {
+	if language == "auto" {
+		return true
+	}
+	if len(language) < 2 || len(language) > 16 {
+		return false
+	}
+	for _, char := range language {
+		if char >= 'a' && char <= 'z' || char >= '0' && char <= '9' || char == '-' || char == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// SubtitlePipeline coordinates source acquisition and local ASR while keeping
+// the later translation stage behind its own interface.
 type SubtitlePipeline interface {
 	Process(context.Context, SubtitleRequest, []MediaOutput) ([]SubtitleArtifact, error)
 }
 
-// ASREngine is the future boundary for whisper.cpp or another local engine.
+// ASREngine keeps the pipeline independent from whisper.cpp process details.
 type ASREngine interface {
 	Transcribe(context.Context, MediaOutput, string) (SubtitleArtifact, error)
 }
@@ -99,10 +137,46 @@ func newSubtitlePipeline(a *app, asr ASREngine, translator Translator) SubtitleP
 
 func (p *defaultSubtitlePipeline) Process(ctx context.Context, request SubtitleRequest, media []MediaOutput) ([]SubtitleArtifact, error) {
 	existing := subtitleArtifactsFromMedia(media)
-	if !request.enabled() || len(existing) > 0 || sourceSubtitleAttemptComplete(media) {
+	if !request.enabled() {
 		return existing, nil
 	}
-	return p.app.downloadSiteSubtitles(ctx, request, media)
+	if request.Mode == "site" {
+		if len(existing) > 0 || sourceSubtitleAttemptComplete(media) {
+			return existing, nil
+		}
+		return p.app.downloadSiteSubtitles(ctx, request, media)
+	}
+	if request.Mode == "site-or-asr" {
+		if len(existing) > 0 {
+			return existing, nil
+		}
+		if !sourceSubtitleAttemptComplete(media) {
+			artifacts, err := p.app.downloadSiteSubtitles(ctx, request, media)
+			if err == nil && len(artifacts) > 0 {
+				return artifacts, nil
+			}
+			if err != nil {
+				fmt.Fprintln(consoleErr, "警告：原站字幕获取失败，继续使用本地语音识别：", err)
+			}
+		}
+	}
+	return p.transcribeMedia(ctx, request, media)
+}
+
+func (p *defaultSubtitlePipeline) transcribeMedia(ctx context.Context, request SubtitleRequest, media []MediaOutput) ([]SubtitleArtifact, error) {
+	if p.asr == nil {
+		return nil, errors.New("本地语音识别引擎尚未配置")
+	}
+	artifacts := make([]SubtitleArtifact, 0, len(media))
+	for index, output := range media {
+		publishJobPhaseProgress("processing", 70+index*25/max(len(media), 1), fmt.Sprintf("正在本地识别语音（%d/%d）", index+1, len(media)), 0, 0, 0)
+		artifact, err := p.asr.Transcribe(ctx, output, request.ASRLanguage)
+		if err != nil {
+			return nil, fmt.Errorf("%s：%w", filepath.Base(output.Path), err)
+		}
+		artifacts = appendUniqueSubtitleArtifacts(artifacts, artifact)
+	}
+	return artifacts, nil
 }
 
 func sourceSubtitleAttemptComplete(media []MediaOutput) bool {

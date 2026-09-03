@@ -1,12 +1,22 @@
 package downkit
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 )
+
+type recordingASREngine struct {
+	called bool
+}
+
+func (e *recordingASREngine) Transcribe(_ context.Context, media MediaOutput, language string) (SubtitleArtifact, error) {
+	e.called = true
+	return SubtitleArtifact{Path: media.Path + ".srt", MediaPath: media.Path, Language: language, Format: "srt", Source: "asr"}, nil
+}
 
 func TestNormalizeSubtitleRequest(t *testing.T) {
 	request, err := normalizeSubtitleRequest(SubtitleRequest{
@@ -20,6 +30,33 @@ func TestNormalizeSubtitleRequest(t *testing.T) {
 	}
 	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "translate"}); err == nil {
 		t.Fatal("phase-one protocol accepted an unsupported mode")
+	}
+	fallback, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "site-or-asr"})
+	if err != nil || fallback.ASRLanguage != "auto" || len(fallback.Languages) != 2 || !fallback.needsASR() || !fallback.usesSiteSubtitles() {
+		t.Fatalf("unexpected fallback request: %#v, %v", fallback, err)
+	}
+	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "asr", ASRLanguage: "bad language"}); err == nil {
+		t.Fatal("invalid ASR language was accepted")
+	}
+}
+
+func TestSubtitlePipelineFallsBackToASR(t *testing.T) {
+	engine := &recordingASREngine{}
+	pipeline := newSubtitlePipeline(&app{}, engine, nil)
+	media := []MediaOutput{{Path: "video.mp4", SubtitleAttempted: true}}
+	artifacts, err := pipeline.Process(context.Background(), SubtitleRequest{Mode: "site-or-asr", ASRLanguage: "auto"}, media)
+	if err != nil || !engine.called || len(artifacts) != 1 || artifacts[0].Source != "asr" {
+		t.Fatalf("ASR fallback failed: artifacts=%#v called=%v err=%v", artifacts, engine.called, err)
+	}
+}
+
+func TestSubtitlePipelinePrefersExistingSiteArtifact(t *testing.T) {
+	engine := &recordingASREngine{}
+	pipeline := newSubtitlePipeline(&app{}, engine, nil)
+	media := []MediaOutput{{Path: "video.mp4", SubtitleArtifacts: []SubtitleArtifact{{Path: "video.zh.vtt", Source: "site"}}}}
+	artifacts, err := pipeline.Process(context.Background(), SubtitleRequest{Mode: "site-or-asr", ASRLanguage: "auto"}, media)
+	if err != nil || engine.called || len(artifacts) != 1 || artifacts[0].Source != "site" {
+		t.Fatalf("site subtitle was not preferred: artifacts=%#v called=%v err=%v", artifacts, engine.called, err)
 	}
 }
 

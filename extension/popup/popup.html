@@ -37,8 +37,10 @@
         <option value="site-zh">原站中文（含自动字幕）</option>
         <option value="site-en">原站英文（含自动字幕）</option>
         <option value="site-all">全部原站字幕</option>
+        <option value="site-or-asr">原站优先，无字幕时本地识别</option>
+        <option value="asr">始终使用本地语音识别</option>
       </select>
-      <span>优先保存网站已有字幕；当前版本不做语音识别和翻译。</span>
+      <span>本地识别需要在“工具与配置”中设置 whisper-cli 和 GGML 模型；当前版本不做翻译。</span>
     </div>
     <div id="mediaList" class="media-list" aria-live="polite"></div>
     <p id="emptyMedia" class="empty" hidden>尚未检测到媒体。请先播放视频，再重新打开扩展。</p>
