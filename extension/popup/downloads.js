@@ -86,7 +86,10 @@
   }
 
   function selectedSubtitleRequest(source) {
-    const select = (source || document).getElementById("subtitleMode");
+    const controls = source || document;
+    const select = controls.getElementById("subtitleMode");
+    const languageSelect = controls.getElementById("asrLanguage");
+    const asrLanguage = String(languageSelect && languageSelect.value || "auto").trim().toLowerCase() || "auto";
     switch (select ? select.value : "none") {
       case "site-zh":
         return { mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best" };
@@ -95,12 +98,23 @@
       case "site-all":
         return { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
       case "site-or-asr":
-        return { mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage: "auto" };
+        return { mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage };
       case "asr":
-        return { mode: "asr", includeAutomatic: false, format: "srt", asrLanguage: "auto" };
+        return { mode: "asr", includeAutomatic: false, format: "srt", asrLanguage };
       default:
         return { mode: "none" };
     }
+  }
+
+  function syncASRLanguageVisibility(source) {
+    const controls = source || document;
+    const mode = controls.getElementById("subtitleMode");
+    const visible = Boolean(mode && ["site-or-asr", "asr"].includes(mode.value));
+    for (const id of ["asrLanguageLabel", "asrLanguage", "asrLanguageHint"]) {
+      const element = controls.getElementById(id);
+      if (element) element.hidden = !visible;
+    }
+    return visible;
   }
 
   async function download(resource) {
@@ -131,6 +145,9 @@
   }
 
   function init() {
+    const subtitleMode = document.getElementById("subtitleMode");
+    if (subtitleMode) subtitleMode.addEventListener("change", () => syncASRLanguageVisibility());
+    syncASRLanguageVisibility();
     document.getElementById("clearMedia").addEventListener("click", async () => {
       if (!activeTab) return;
       await api.send("media.clear", { tabId: activeTab.id });
@@ -158,6 +175,6 @@
 
   root.DownKitDownloads = { init, activate, deactivate };
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { selectedQuality, selectedSubtitleRequest, copyText };
+    module.exports = { selectedQuality, selectedSubtitleRequest, syncASRLanguageVisibility, copyText };
   }
 })(globalThis);
