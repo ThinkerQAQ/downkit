@@ -256,7 +256,7 @@ func (p *defaultSubtitlePipeline) transcribeMedia(ctx context.Context, request S
 	}
 	artifacts := make([]SubtitleArtifact, 0, len(media))
 	for index, output := range media {
-		publishJobPhaseProgress("processing", 70+index*25/max(len(media), 1), fmt.Sprintf("正在本地识别语音（%d/%d）", index+1, len(media)), 0, 0, 0)
+		publishJobPhaseProgress("processing", 0, fmt.Sprintf("正在准备本地语音识别（视频 %d/%d）", index+1, len(media)), 0, 0, 0)
 		artifact, err := p.asr.Transcribe(ctx, output, request.ASRLanguage)
 		if err != nil {
 			return nil, fmt.Errorf("%s：%w", filepath.Base(output.Path), err)

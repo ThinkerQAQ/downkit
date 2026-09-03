@@ -109,6 +109,14 @@ func TestTranslationCheckpointDiscardsUnknownAndEmptyEntries(t *testing.T) {
 	}
 }
 
+func TestCompletedTranslationCountUsesKnownNonEmptyCues(t *testing.T) {
+	document := SubtitleDocument{Cues: []SubtitleCue{{ID: 1}, {ID: 2}, {ID: 3}}}
+	translations := map[int]string{1: "done", 2: " ", 99: "unknown"}
+	if got := completedTranslationCount(translations, document); got != 1 {
+		t.Fatalf("completed translations = %d, want 1", got)
+	}
+}
+
 func TestTranslationSourceLanguage(t *testing.T) {
 	if got, err := translationSourceLanguage("JA-orig"); err != nil || got != "ja" {
 		t.Fatalf("source language = %q, %v", got, err)

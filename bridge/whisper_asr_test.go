@@ -68,6 +68,48 @@ func TestWhisperCommandArguments(t *testing.T) {
 			t.Fatalf("missing %q in %#v", required, whisper)
 		}
 	}
+	for _, required := range []string{"-progress", "pipe:1", "-nostats"} {
+		if !slices.Contains(audio, required) {
+			t.Fatalf("missing %q in %#v", required, audio)
+		}
+	}
+	if !slices.Contains(whisper, "-pp") {
+		t.Fatalf("Whisper native progress is disabled: %#v", whisper)
+	}
+}
+
+func TestFFmpegAudioProgressReporterUsesMediaTimeline(t *testing.T) {
+	type update struct {
+		progress int
+		detail   string
+	}
+	var updates []update
+	reporter := newFFmpegAudioProgressReporter(func(progress int, detail string) {
+		updates = append(updates, update{progress: progress, detail: detail})
+	})
+	reporter.logLine("Duration: 00:10:00.00, start: 0.000000, bitrate: 1000 kb/s")
+	reporter.progressLine("out_time_us=150000000")
+	reporter.progressLine("speed=20.0x")
+	reporter.progressLine("progress=continue")
+	reporter.progressLine("progress=end")
+	if len(updates) < 3 || updates[len(updates)-2].progress != 25 || updates[len(updates)-1].progress != 100 {
+		t.Fatalf("unexpected FFmpeg progress updates: %#v", updates)
+	}
+	if !strings.Contains(updates[len(updates)-2].detail, "02:30 / 10:00") {
+		t.Fatalf("timeline detail missing: %#v", updates)
+	}
+}
+
+func TestWhisperProgressReporterParsesNativeOutput(t *testing.T) {
+	var progress []int
+	reporter := newWhisperProgressReporter(func(value int, _ string) { progress = append(progress, value) })
+	writer := newProgressLineWriter(reporter.line)
+	_, _ = writer.Write([]byte("whisper_print_progress_callback: progress =  15%\r"))
+	_, _ = writer.Write([]byte("whisper_print_progress_callback: progress =  45%\n"))
+	_, _ = writer.Write([]byte("whisper_print_progress_callback: progress =  45%\n"))
+	if !slices.Equal(progress, []int{15, 45}) {
+		t.Fatalf("unexpected Whisper progress: %#v", progress)
+	}
 }
 
 func TestCheckFFmpegASRCapabilities(t *testing.T) {

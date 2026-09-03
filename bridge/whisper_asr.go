@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type asrCommandRunner func(context.Context, string, []string, string, io.Writer, io.Writer) error
@@ -121,28 +122,44 @@ func (e *whisperASREngine) Transcribe(ctx context.Context, media MediaOutput, la
 		MediaPath: media.Path, MediaIndex: media.Index, MediaID: media.ItemID,
 	}
 	if info, statErr := os.Stat(outputPath); statErr == nil && info.Mode().IsRegular() && info.Size() > 0 {
+		publishJobPhaseProgress("transcribing", 100, "已复用完成的本地识别字幕", 0, 0, 0)
 		fmt.Fprintln(consoleOut, "复用已完成的本地识别字幕：", outputPath)
 		return artifact, nil
 	}
 
-	publishJobPhaseProgress("processing", 76, "正在提取语音识别音频", 0, 0, 0)
-	fmt.Fprintln(consoleOut, "本地 ASR：正在提取 16 kHz 单声道音频：", filepath.Base(media.Path))
+	publishJobPhaseProgress("extracting-audio", 0, "正在读取媒体时长并提取 16 kHz 音频", 0, 0, 0)
+	extractStarted := time.Now()
+	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=whisper-asr operation=extract-audio status=start media=%q\n", time.Now().Format(time.RFC3339), filepath.Base(media.Path))
 	var ffmpegError tailBuffer
 	ffmpegError.limit = 32 * 1024
-	if err := e.run(ctx, ffmpegPath, whisperAudioArgs(media.Path, audioPath), "", io.Discard, &ffmpegError); err != nil {
+	ffmpegProgress := newFFmpegAudioProgressReporter(func(progress int, detail string) {
+		publishJobPhaseProgress("extracting-audio", progress, detail, 0, 0, 0)
+	})
+	ffmpegStdout := newProgressLineWriter(ffmpegProgress.progressLine)
+	ffmpegStderr := newProgressLineWriter(ffmpegProgress.logLine)
+	if err := e.run(ctx, ffmpegPath, whisperAudioArgs(media.Path, audioPath), "", ffmpegStdout, io.MultiWriter(&ffmpegError, ffmpegStderr)); err != nil {
+		fmt.Fprintf(consoleErr, "timestamp=%s level=ERROR node=whisper-asr operation=extract-audio status=failed durationMs=%d error=%q\n", time.Now().Format(time.RFC3339), time.Since(extractStarted).Milliseconds(), err)
 		return SubtitleArtifact{}, commandFailure("FFmpeg 音频提取失败", err, ffmpegError.String())
 	}
+	publishJobPhaseProgress("extracting-audio", 100, "音频提取完成", 0, 0, 0)
+	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=whisper-asr operation=extract-audio status=completed durationMs=%d\n", time.Now().Format(time.RFC3339), time.Since(extractStarted).Milliseconds())
 
-	publishJobPhaseProgress("processing", 82, "whisper.cpp 正在识别语音", 0, 0, 0)
-	fmt.Fprintf(consoleOut, "本地 ASR：whisper.cpp 开始识别（语言 %s）\n", language)
+	publishJobPhaseProgress("transcribing", 0, "正在加载 Whisper 模型并准备识别", 0, 0, 0)
+	transcribeStarted := time.Now()
+	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=whisper-asr operation=transcribe status=start language=%s\n", time.Now().Format(time.RFC3339), language)
 	var whisperError tailBuffer
 	whisperError.limit = 64 * 1024
-	stderr := io.MultiWriter(consoleErr, &whisperError)
+	whisperProgress := newWhisperProgressReporter(func(progress int, detail string) {
+		publishJobPhaseProgress("transcribing", progress, detail, 0, 0, 0)
+	})
+	stderr := io.MultiWriter(consoleErr, &whisperError, newProgressLineWriter(whisperProgress.line))
 	stagedOutputPath := filepath.Join(asrDir, key+".transcript.srt")
 	_ = os.Remove(stagedOutputPath)
 	if err := e.run(ctx, whisperPath, whisperCLIArgs(e.modelPath, filepath.Base(audioPath), filepath.Base(stagedOutputPath), language), asrDir, consoleOut, stderr); err != nil {
+		fmt.Fprintf(consoleErr, "timestamp=%s level=ERROR node=whisper-asr operation=transcribe status=failed durationMs=%d error=%q\n", time.Now().Format(time.RFC3339), time.Since(transcribeStarted).Milliseconds(), err)
 		return SubtitleArtifact{}, commandFailure("whisper.cpp 识别失败", err, whisperError.String())
 	}
+	publishJobPhaseProgress("transcribing", 100, "语音识别完成", 0, 0, 0)
 	info, err := os.Stat(stagedOutputPath)
 	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
 		return SubtitleArtifact{}, errors.New("whisper.cpp 已退出但没有生成有效的 SRT 文件")
@@ -150,7 +167,7 @@ func (e *whisperASREngine) Transcribe(ctx context.Context, media MediaOutput, la
 	if err := os.Rename(stagedOutputPath, outputPath); err != nil {
 		return SubtitleArtifact{}, fmt.Errorf("无法保存本地识别字幕：%w", err)
 	}
-	fmt.Fprintln(consoleOut, "本地 ASR：字幕已保存：", outputPath)
+	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=whisper-asr operation=transcribe status=completed durationMs=%d output=%q\n", time.Now().Format(time.RFC3339), time.Since(transcribeStarted).Milliseconds(), outputPath)
 	if !e.keepWork {
 		_ = os.Remove(audioPath)
 	}
@@ -159,7 +176,7 @@ func (e *whisperASREngine) Transcribe(ctx context.Context, media MediaOutput, la
 
 func whisperAudioArgs(mediaPath, audioPath string) []string {
 	return []string{
-		"-hide_banner", "-loglevel", "error", "-y", "-i", mediaPath,
+		"-hide_banner", "-loglevel", "info", "-nostats", "-progress", "pipe:1", "-y", "-i", mediaPath,
 		"-vn", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", "-f", "wav", audioPath,
 	}
 }
@@ -168,7 +185,7 @@ func whisperCLIArgs(modelPath, audioPath, outputPath, language string) []string 
 	outputBase := strings.TrimSuffix(outputPath, filepath.Ext(outputPath))
 	return []string{
 		"-m", modelPath, "-f", audioPath, "-l", language,
-		"-osrt", "-of", outputBase, "-np",
+		"-osrt", "-of", outputBase, "-np", "-pp",
 	}
 }
 

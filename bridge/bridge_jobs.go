@@ -270,7 +270,7 @@ func (s *bridgeServer) setJobProgress(jobID, phase string, progress int, detail 
 	phase = strings.TrimSpace(phase)
 	if phase != "" {
 		switch phase {
-		case "resolving", "downloading", "processing":
+		case "resolving", "downloading", "processing", "extracting-audio", "transcribing", "loading-translator", "translating", "finalizing-subtitles":
 			job.Phase = phase
 		default:
 			return errors.New("invalid task phase")

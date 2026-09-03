@@ -153,8 +153,10 @@ button:disabled { opacity: .55; cursor: default; }
 .job-progress-row { display: flex; align-items: center; gap: 7px; margin-top: 6px; }
 .job-progress { flex: 1; height: 5px; overflow: hidden; border-radius: 999px; background: #e7ebeb; }
 .job-progress-value { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width .2s ease; }
+.job-progress.indeterminate .job-progress-value { animation: job-progress-indeterminate 1.2s ease-in-out infinite; }
+@keyframes job-progress-indeterminate { from { transform: translateX(-110%); } to { transform: translateX(300%); } }
 .job-speed { width: 61px; color: #245f59; font-size: 9px; font-weight: 650; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.job-percent { width: 30px; color: #3f4e54; font-size: 9px; text-align: right; }
+.job-percent { min-width: 30px; color: #3f4e54; font-size: 9px; text-align: right; white-space: nowrap; }
 .job-detail { display: block; margin-top: 4px; color: #59676d; font-size: 9px; }
 .job-meta { display: block; margin-top: 3px; color: #909ba0; font-size: 8px; }
 .job-error { margin: 4px 0 0; color: var(--danger); font-size: 9px; overflow-wrap: anywhere; }

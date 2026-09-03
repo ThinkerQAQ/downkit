@@ -130,6 +130,7 @@ func (t *llamaTranslator) Translate(ctx context.Context, artifact SubtitleArtifa
 	}
 	if existing, readErr := os.ReadFile(outputPath); readErr == nil {
 		if _, parseErr := parseSRT(existing); parseErr == nil {
+			publishJobPhaseProgress("translating", 100, "已复用完成的翻译字幕", 0, 0, 0)
 			fmt.Fprintln(consoleOut, "本地翻译：复用已完成字幕：", outputPath)
 			return result, nil
 		}
@@ -137,14 +138,17 @@ func (t *llamaTranslator) Translate(ctx context.Context, artifact SubtitleArtifa
 
 	checkpointPath := filepath.Join(translationDir, "translated.json")
 	translations := loadTranslationCheckpoint(checkpointPath, document)
+	completed := completedTranslationCount(translations, document)
+	publishTranslationProgress(completed, len(document.Cues))
+	if completed < len(document.Cues) {
+		if err := t.ensureServer(ctx); err != nil {
+			return SubtitleArtifact{}, err
+		}
+	}
 	for index, cue := range document.Cues {
 		if strings.TrimSpace(translations[cue.ID]) != "" {
 			continue
 		}
-		if err := t.ensureServer(ctx); err != nil {
-			return SubtitleArtifact{}, err
-		}
-		publishJobPhaseProgress("processing", 86+index*10/max(len(document.Cues), 1), fmt.Sprintf("正在翻译字幕（%d/%d）", index+1, len(document.Cues)), 0, 0, 0)
 		translated, translateErr := t.translateCueWithRetry(ctx, sourceLanguage, targetLanguage, cue.Text)
 		if translateErr != nil {
 			fmt.Fprintf(consoleErr, "本地翻译：失败 cue=%d durationMs=%d error=%v\n", cue.ID, time.Since(started).Milliseconds(), translateErr)
@@ -154,7 +158,10 @@ func (t *llamaTranslator) Translate(ctx context.Context, artifact SubtitleArtifa
 		if err := saveTranslationCheckpoint(checkpointPath, translations); err != nil {
 			return SubtitleArtifact{}, err
 		}
+		completed++
+		publishJobPhaseProgress("translating", completed*100/max(len(document.Cues), 1), fmt.Sprintf("已翻译 %d/%d 条字幕 · 最近完成第 %d 条", completed, len(document.Cues), index+1), 0, 0, 0)
 	}
+	publishJobPhaseProgress("finalizing-subtitles", 0, "正在生成字幕文件", 0, 0, 0)
 	translatedDocument, err := document.withTranslations(translations, bilingual)
 	if err != nil {
 		return SubtitleArtifact{}, err
@@ -166,6 +173,7 @@ func (t *llamaTranslator) Translate(ctx context.Context, artifact SubtitleArtifa
 	if err := writeTranslationFile(outputPath, encoded); err != nil {
 		return SubtitleArtifact{}, fmt.Errorf("无法保存翻译字幕：%w", err)
 	}
+	publishJobPhaseProgress("finalizing-subtitles", 100, "字幕文件生成完成", 0, 0, 0)
 	fmt.Fprintf(consoleOut, "本地翻译：完成 cues=%d durationMs=%d output=%s\n", len(document.Cues), time.Since(started).Milliseconds(), outputPath)
 	return result, nil
 }
@@ -198,6 +206,7 @@ func (t *llamaTranslator) ensureServer(ctx context.Context) error {
 	if err := validateTranslationModel(t.modelPath); err != nil {
 		return err
 	}
+	publishJobPhaseProgress("loading-translator", 0, "正在将翻译模型载入内存（此阶段不提供百分比）", 0, 0, 0)
 	serverPath, err := findTool(t.serverPath, "llama-server")
 	if err != nil {
 		return err
@@ -217,8 +226,10 @@ func (t *llamaTranslator) ensureServer(ctx context.Context) error {
 	configureSidecarCommand(command)
 	command.Stdout = &t.serverLog
 	command.Stderr = &t.serverLog
-	fmt.Fprintf(consoleOut, "本地翻译：启动 llama-server port=%d model=%s\n", port, filepath.Base(t.modelPath))
+	loadStarted := time.Now()
+	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=llama-translator operation=load-model status=start port=%d model=%q\n", time.Now().Format(time.RFC3339), port, filepath.Base(t.modelPath))
 	if err := command.Start(); err != nil {
+		fmt.Fprintf(consoleErr, "timestamp=%s level=ERROR node=llama-translator operation=load-model status=failed durationMs=%d error=%q\n", time.Now().Format(time.RFC3339), time.Since(loadStarted).Milliseconds(), err)
 		return fmt.Errorf("无法启动 llama-server：%w", err)
 	}
 	t.process = command
@@ -228,10 +239,29 @@ func (t *llamaTranslator) ensureServer(ctx context.Context) error {
 	if err := waitForLlamaHealth(ctx, t.client, t.baseURL, t.processDone); err != nil {
 		_ = t.Close()
 		detail := strings.TrimSpace(t.serverLog.String())
+		fmt.Fprintf(consoleErr, "timestamp=%s level=ERROR node=llama-translator operation=load-model status=failed durationMs=%d error=%q\n", time.Now().Format(time.RFC3339), time.Since(loadStarted).Milliseconds(), err)
 		return commandFailure("llama-server 启动失败", err, detail)
 	}
-	fmt.Fprintln(consoleOut, "本地翻译：llama-server 已就绪")
+	fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=llama-translator operation=load-model status=ready durationMs=%d\n", time.Now().Format(time.RFC3339), time.Since(loadStarted).Milliseconds())
 	return nil
+}
+
+func completedTranslationCount(translations map[int]string, document SubtitleDocument) int {
+	completed := 0
+	for _, cue := range document.Cues {
+		if strings.TrimSpace(translations[cue.ID]) != "" {
+			completed++
+		}
+	}
+	return completed
+}
+
+func publishTranslationProgress(completed, total int) {
+	progress := 100
+	if total > 0 {
+		progress = min(100, max(0, completed*100/total))
+	}
+	publishJobPhaseProgress("translating", progress, fmt.Sprintf("已翻译 %d/%d 条字幕", completed, total), 0, 0, 0)
 }
 
 func waitForLlamaHealth(ctx context.Context, client *http.Client, baseURL string, processDone <-chan error) error {

@@ -34,6 +34,11 @@ assert.equal(jobs.fileSectionExpanded(expansionPreferences, "playlist", 2), true
 
 const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../popup/jobs.js"), "utf8");
 assert.match(source, /resolving:\s*"解析中"/);
+assert.match(source, /"extracting-audio":\s*"提取音频"/);
+assert.match(source, /transcribing:\s*"识别字幕"/);
+assert.match(source, /"loading-translator":\s*"加载翻译模型"/);
+assert.match(source, /translating:\s*"翻译字幕"/);
+assert.match(source, /aria-valuetext/);
 assert.match(source, /解析 100%/);
 assert.match(source, /已下载/);
 assert.match(source, /仅删除记录/);

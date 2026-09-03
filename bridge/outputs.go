@@ -45,7 +45,7 @@ func (a *app) finalizeOutputs(outputs []MediaOutput) error {
 		if a.subtitlePipeline == nil {
 			return errors.New("字幕流水线尚未配置")
 		}
-		publishJobPhaseProgress("processing", 70, "正在处理字幕", 0, 0, 0)
+		publishJobPhaseProgress("processing", 0, "正在准备字幕处理", 0, 0, 0)
 		generated, pipelineErr := a.subtitlePipeline.Process(context.Background(), a.opts.subtitleRequest, outputs)
 		if pipelineErr != nil {
 			return fmt.Errorf("字幕处理失败：%w", pipelineErr)

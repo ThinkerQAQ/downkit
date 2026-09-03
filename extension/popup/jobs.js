@@ -16,8 +16,14 @@
   const phaseLabels = {
     resolving: "解析中",
     downloading: "下载中",
-    processing: "处理中"
+    processing: "准备字幕",
+    "extracting-audio": "提取音频",
+    transcribing: "识别字幕",
+    "loading-translator": "加载翻译模型",
+    translating: "翻译字幕",
+    "finalizing-subtitles": "生成字幕"
   };
+  const postResolvePhases = new Set(["downloading", "processing", "extracting-audio", "transcribing", "loading-translator", "translating", "finalizing-subtitles"]);
 
   function formatBytes(value) {
     if (!Number.isFinite(value) || value <= 0) return "";
@@ -176,10 +182,18 @@
       node.querySelector(".job-meta").textContent = `${job.id} · ${api.formatTime(job.updatedAt || job.createdAt)}`;
 
       const percent = node.querySelector(".job-percent");
-      percent.textContent = `${progress}%`;
+      const indeterminate = job.status === "running" && job.phase === "loading-translator";
+      percent.textContent = indeterminate ? "进行中" : `${progress}%`;
       const bar = node.querySelector(".job-progress-value");
-      bar.style.width = `${progress}%`;
-      bar.parentElement.setAttribute("aria-valuenow", String(progress));
+      bar.style.width = indeterminate ? "35%" : `${progress}%`;
+      bar.parentElement.classList.toggle("indeterminate", indeterminate);
+      if (indeterminate) {
+        bar.parentElement.removeAttribute("aria-valuenow");
+        bar.parentElement.setAttribute("aria-valuetext", "翻译模型正在加载，无法计算百分比");
+      } else {
+        bar.parentElement.setAttribute("aria-valuenow", String(progress));
+        bar.parentElement.removeAttribute("aria-valuetext");
+      }
       const speed = job.status === "running" ? Math.max(0, Number(job.speedBytesPerSecond) || 0) : 0;
       const speedElement = node.querySelector(".job-speed");
       speedElement.textContent = speed > 0 ? formatSpeed(speed) : "—";
@@ -188,7 +202,7 @@
 	  const byteText = job.totalBytes > 0
 		? ` · ${downloadedText} / ${formatBytes(job.totalBytes)}`
 		: (downloadedText ? ` · 已下载 ${downloadedText}` : "");
-      const phasePrefix = job.phase === "downloading" || job.phase === "processing" ? "解析 100% · " : "";
+      const phasePrefix = postResolvePhases.has(job.phase) ? "解析 100% · " : "";
       node.querySelector(".job-detail").textContent = `${phasePrefix}${job.detail || stateLabels[job.status] || ""}${byteText}`;
 
       if (job.error) {

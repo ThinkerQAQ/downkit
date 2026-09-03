@@ -102,6 +102,12 @@ func TestJobProgressPauseAndDelete(t *testing.T) {
 	if job.Phase != "downloading" || job.Progress != 42 || job.Detail != "下载中" || job.DownloadedBytes != 1024 || job.TotalBytes != 4096 || job.SpeedBytesPerSecond != 5242880 {
 		t.Fatalf("unexpected progress: %+v", job)
 	}
+	for _, phase := range []string{"extracting-audio", "transcribing", "loading-translator", "translating", "finalizing-subtitles"} {
+		response = call("/v1/jobs/job-1/progress", `{"phase":`+strconv.Quote(phase)+`,"progress":25,"detail":"字幕处理中"}`)
+		if response.Code != http.StatusOK || job.Phase != phase || job.Progress != 25 {
+			t.Fatalf("subtitle phase %q rejected: status=%d job=%+v", phase, response.Code, job)
+		}
+	}
 
 	response = call("/v1/jobs/job-1/output", `{"path":`+strconv.Quote(outputPath)+`}`)
 	if response.Code != http.StatusOK || len(job.OutputPaths) != 1 || job.OutputPaths[0] != outputPath {
