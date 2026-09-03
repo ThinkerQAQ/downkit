@@ -17,19 +17,40 @@ assert.deepEqual(downloads.selectedSubtitleRequest({ getElementById: () => null 
 assert.deepEqual(downloads.selectedSubtitleRequest(controls({ subtitleMode: "asr", asrLanguage: "en" })), {
   mode: "asr", includeAutomatic: false, format: "srt", asrLanguage: "en"
 });
+assert.deepEqual(downloads.selectedSubtitleRequest(controls({
+  subtitleMode: "site-or-asr", asrLanguage: "ja", subtitleTargetLanguage: "zh-Hans", subtitleLayout: "bilingual"
+})), {
+  mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best",
+  asrLanguage: "ja", targetLanguage: "zh-Hans", bilingual: true
+});
 
 const visibilityElements = {
   subtitleMode: { value: "asr" },
   asrLanguageLabel: { hidden: true },
   asrLanguage: { hidden: true },
-  asrLanguageHint: { hidden: true }
+  asrLanguageHint: { hidden: true },
+  subtitleTargetLanguageLabel: { hidden: true },
+  subtitleTargetLanguage: { hidden: true, value: "" },
+  subtitleTargetLanguageHint: { hidden: true },
+  subtitleLayoutLabel: { hidden: true },
+  subtitleLayout: { hidden: true },
+  subtitleLayoutHint: { hidden: true }
 };
 const visibilitySource = { getElementById: id => visibilityElements[id] || null };
-assert.equal(downloads.syncASRLanguageVisibility(visibilitySource), true);
+assert.deepEqual(downloads.syncSubtitleOptionsVisibility(visibilitySource), {
+  subtitlesVisible: true, asrVisible: true, layoutVisible: false
+});
 assert.equal(visibilityElements.asrLanguage.hidden, false);
+assert.equal(visibilityElements.subtitleTargetLanguage.hidden, false);
+visibilityElements.subtitleTargetLanguage.value = "zh-Hans";
+assert.equal(downloads.syncSubtitleOptionsVisibility(visibilitySource).layoutVisible, true);
+assert.equal(visibilityElements.subtitleLayout.hidden, false);
 visibilityElements.subtitleMode.value = "site-en";
-assert.equal(downloads.syncASRLanguageVisibility(visibilitySource), false);
+assert.equal(downloads.syncSubtitleOptionsVisibility(visibilitySource).asrVisible, false);
 assert.equal(visibilityElements.asrLanguageHint.hidden, true);
+visibilityElements.subtitleMode.value = "none";
+assert.equal(downloads.syncSubtitleOptionsVisibility(visibilitySource).subtitlesVisible, false);
+assert.equal(visibilityElements.subtitleTargetLanguage.hidden, true);
 
 const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../popup/downloads.js"), "utf8");
 assert.match(source, /activateTab\("jobs"\)/);

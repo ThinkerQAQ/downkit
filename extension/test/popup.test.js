@@ -21,6 +21,8 @@ assert.doesNotMatch(html, /嗅探与任务/);
 assert.match(html, /id="openMode"/);
 assert.match(html, /id="asrLanguage"/);
 assert.match(html, /这是视频里说的语言，不是翻译目标语言/);
+assert.match(html, /id="subtitleTargetLanguage"/);
+assert.match(html, /id="subtitleLayout"/);
 assert.match(html, /id="playlistDialog"/);
 assert.match(html, /id="deleteJobDialog"/);
 assert.match(html, /id="jobFileTemplate"/);

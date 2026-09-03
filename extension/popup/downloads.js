@@ -90,31 +90,56 @@
     const select = controls.getElementById("subtitleMode");
     const languageSelect = controls.getElementById("asrLanguage");
     const asrLanguage = String(languageSelect && languageSelect.value || "auto").trim().toLowerCase() || "auto";
+    let request;
     switch (select ? select.value : "none") {
       case "site-zh":
-        return { mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best" };
+        request = { mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best" };
+        break;
       case "site-en":
-        return { mode: "site", languages: ["en.*"], includeAutomatic: true, format: "best" };
+        request = { mode: "site", languages: ["en.*"], includeAutomatic: true, format: "best" };
+        break;
       case "site-all":
-        return { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
+        request = { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
+        break;
       case "site-or-asr":
-        return { mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage };
+        request = { mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage };
+        break;
       case "asr":
-        return { mode: "asr", includeAutomatic: false, format: "srt", asrLanguage };
+        request = { mode: "asr", includeAutomatic: false, format: "srt", asrLanguage };
+        break;
       default:
         return { mode: "none" };
     }
+    const targetSelect = controls.getElementById("subtitleTargetLanguage");
+    const targetLanguage = String(targetSelect && targetSelect.value || "").trim();
+    if (targetLanguage) {
+      const layoutSelect = controls.getElementById("subtitleLayout");
+      request.targetLanguage = targetLanguage;
+      request.bilingual = Boolean(layoutSelect && layoutSelect.value === "bilingual");
+    }
+    return request;
   }
 
-  function syncASRLanguageVisibility(source) {
+  function syncSubtitleOptionsVisibility(source) {
     const controls = source || document;
     const mode = controls.getElementById("subtitleMode");
-    const visible = Boolean(mode && ["site-or-asr", "asr"].includes(mode.value));
+    const subtitlesVisible = Boolean(mode && mode.value !== "none");
+    const asrVisible = Boolean(mode && ["site-or-asr", "asr"].includes(mode.value));
     for (const id of ["asrLanguageLabel", "asrLanguage", "asrLanguageHint"]) {
       const element = controls.getElementById(id);
-      if (element) element.hidden = !visible;
+      if (element) element.hidden = !asrVisible;
     }
-    return visible;
+    for (const id of ["subtitleTargetLanguageLabel", "subtitleTargetLanguage", "subtitleTargetLanguageHint"]) {
+      const element = controls.getElementById(id);
+      if (element) element.hidden = !subtitlesVisible;
+    }
+    const target = controls.getElementById("subtitleTargetLanguage");
+    const layoutVisible = subtitlesVisible && Boolean(target && target.value);
+    for (const id of ["subtitleLayoutLabel", "subtitleLayout", "subtitleLayoutHint"]) {
+      const element = controls.getElementById(id);
+      if (element) element.hidden = !layoutVisible;
+    }
+    return { subtitlesVisible, asrVisible, layoutVisible };
   }
 
   async function download(resource) {
@@ -146,8 +171,10 @@
 
   function init() {
     const subtitleMode = document.getElementById("subtitleMode");
-    if (subtitleMode) subtitleMode.addEventListener("change", () => syncASRLanguageVisibility());
-    syncASRLanguageVisibility();
+    if (subtitleMode) subtitleMode.addEventListener("change", () => syncSubtitleOptionsVisibility());
+    const targetLanguage = document.getElementById("subtitleTargetLanguage");
+    if (targetLanguage) targetLanguage.addEventListener("change", () => syncSubtitleOptionsVisibility());
+    syncSubtitleOptionsVisibility();
     document.getElementById("clearMedia").addEventListener("click", async () => {
       if (!activeTab) return;
       await api.send("media.clear", { tabId: activeTab.id });
@@ -175,6 +202,6 @@
 
   root.DownKitDownloads = { init, activate, deactivate };
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { selectedQuality, selectedSubtitleRequest, syncASRLanguageVisibility, copyText };
+    module.exports = { selectedQuality, selectedSubtitleRequest, syncSubtitleOptionsVisibility, copyText };
   }
 })(globalThis);

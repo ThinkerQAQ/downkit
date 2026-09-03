@@ -16,12 +16,17 @@
     const languages = Array.isArray(request.languages)
       ? [...new Set(request.languages.map(item => String(item || "").trim()).filter(Boolean))].slice(0, 20)
       : [];
+    const targetLanguage = String(request.targetLanguage || "").trim();
     return {
       mode: request.mode,
       ...(["site", "site-or-asr"].includes(request.mode) ? { languages: languages.length ? languages : ["all", "-live_chat"] } : {}),
       includeAutomatic: Boolean(request.includeAutomatic),
       format: ["best", "srt", "vtt", "ass"].includes(request.format) ? request.format : "best",
-      ...(["asr", "site-or-asr"].includes(request.mode) ? { asrLanguage: String(request.asrLanguage || "auto").trim().toLowerCase() || "auto" } : {})
+      ...(["asr", "site-or-asr"].includes(request.mode) ? { asrLanguage: String(request.asrLanguage || "auto").trim().toLowerCase() || "auto" } : {}),
+      ...(targetLanguage && /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(targetLanguage) ? {
+        targetLanguage,
+        bilingual: Boolean(request.bilingual)
+      } : {})
     };
   }
 

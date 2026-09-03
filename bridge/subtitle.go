@@ -22,6 +22,8 @@ type SubtitleRequest struct {
 	IncludeAutomatic bool     `json:"includeAutomatic,omitempty"`
 	Format           string   `json:"format,omitempty"`
 	ASRLanguage      string   `json:"asrLanguage,omitempty"`
+	TargetLanguage   string   `json:"targetLanguage,omitempty"`
+	Bilingual        bool     `json:"bilingual,omitempty"`
 }
 
 func (r SubtitleRequest) enabled() bool {
@@ -40,6 +42,10 @@ func (r SubtitleRequest) needsASR() bool {
 
 func (r SubtitleRequest) requiresASRBeforeDownload() bool {
 	return strings.EqualFold(strings.TrimSpace(r.Mode), "asr")
+}
+
+func (r SubtitleRequest) needsTranslation() bool {
+	return strings.TrimSpace(r.TargetLanguage) != ""
 }
 
 func normalizeSubtitleRequest(request SubtitleRequest) (SubtitleRequest, error) {
@@ -90,7 +96,44 @@ func normalizeSubtitleRequest(request SubtitleRequest) (SubtitleRequest, error) 
 	if request.ASRLanguage != "" && !validASRLanguage(request.ASRLanguage) {
 		return request, errors.New("ASR 语言必须是 auto 或有效的语言代码")
 	}
+	request.TargetLanguage = normalizeSubtitleLanguage(request.TargetLanguage)
+	if request.TargetLanguage != "" && !validSubtitleLanguage(request.TargetLanguage) {
+		return request, errors.New("字幕输出语言必须是有效的语言代码")
+	}
+	if request.TargetLanguage != "" && !request.enabled() {
+		return request, errors.New("翻译字幕前必须先选择字幕来源")
+	}
+	if request.Bilingual && request.TargetLanguage == "" {
+		return request, errors.New("双语字幕必须同时选择输出语言")
+	}
 	return request, nil
+}
+
+func normalizeSubtitleLanguage(language string) string {
+	language = strings.TrimSpace(language)
+	switch strings.ToLower(language) {
+	case "", "original":
+		return ""
+	case "zh-hans":
+		return "zh-Hans"
+	case "zh-hant":
+		return "zh-Hant"
+	default:
+		return strings.ToLower(language)
+	}
+}
+
+func validSubtitleLanguage(language string) bool {
+	if len(language) < 2 || len(language) > 35 {
+		return false
+	}
+	for _, char := range language {
+		if char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || char == '-' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func validASRLanguage(language string) bool {
@@ -136,6 +179,9 @@ func newSubtitlePipeline(a *app, asr ASREngine, translator Translator) SubtitleP
 }
 
 func (p *defaultSubtitlePipeline) Process(ctx context.Context, request SubtitleRequest, media []MediaOutput) ([]SubtitleArtifact, error) {
+	if request.needsTranslation() && p.translator == nil {
+		return nil, errors.New("本地字幕翻译引擎尚未配置；请暂时选择“保持原语言”")
+	}
 	existing := subtitleArtifactsFromMedia(media)
 	if !request.enabled() {
 		return existing, nil

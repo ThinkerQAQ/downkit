@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -37,6 +38,31 @@ func TestNormalizeSubtitleRequest(t *testing.T) {
 	}
 	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "asr", ASRLanguage: "bad language"}); err == nil {
 		t.Fatal("invalid ASR language was accepted")
+	}
+	translated, err := normalizeSubtitleRequest(SubtitleRequest{
+		Mode: "asr", ASRLanguage: "ja", TargetLanguage: " ZH-HANS ", Bilingual: true,
+	})
+	if err != nil || translated.TargetLanguage != "zh-Hans" || !translated.Bilingual || !translated.needsTranslation() {
+		t.Fatalf("unexpected translation request: %#v, %v", translated, err)
+	}
+	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "asr", TargetLanguage: "bad language"}); err == nil {
+		t.Fatal("invalid target language was accepted")
+	}
+	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "asr", Bilingual: true}); err == nil {
+		t.Fatal("bilingual request without a target language was accepted")
+	}
+	if _, err := normalizeSubtitleRequest(SubtitleRequest{Mode: "none", TargetLanguage: "zh-Hans"}); err == nil {
+		t.Fatal("translation without a subtitle source was accepted")
+	}
+}
+
+func TestSubtitlePipelineRejectsTranslationWithoutTranslator(t *testing.T) {
+	pipeline := newSubtitlePipeline(&app{}, &recordingASREngine{}, nil)
+	_, err := pipeline.Process(context.Background(), SubtitleRequest{
+		Mode: "asr", ASRLanguage: "ja", TargetLanguage: "zh-Hans",
+	}, []MediaOutput{{Path: "video.mp4"}})
+	if err == nil || !strings.Contains(err.Error(), "翻译引擎尚未配置") {
+		t.Fatalf("translation without an engine should fail clearly: %v", err)
 	}
 }
 

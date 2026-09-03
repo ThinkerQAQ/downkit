@@ -79,10 +79,12 @@ assert.deepEqual(subtitleTask.subtitles, {
 });
 
 const asrTask = launcher.buildTask(list[0], page, "best", [], pageCookies, "single", "profile", {
-  mode: "site-or-asr", languages: [], includeAutomatic: true
+  mode: "site-or-asr", languages: [], includeAutomatic: true,
+  targetLanguage: "zh-Hans", bilingual: true
 });
 assert.deepEqual(asrTask.subtitles, {
-  mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage: "auto"
+  mode: "site-or-asr", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best", asrLanguage: "auto",
+  targetLanguage: "zh-Hans", bilingual: true
 });
 
 const dashTask = launcher.buildTask({
