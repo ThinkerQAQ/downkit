@@ -4,6 +4,8 @@
   const api = root.DownKitPopup;
   let polling = null;
   let active = false;
+  let renderDeferredForSelection = false;
+  let lastRenderedJobs = "";
   const fileExpansionPreferences = new Map();
   const stateLabels = {
     queued: "等待中",
@@ -68,6 +70,11 @@
 
   function fileSectionExpanded(preferences, jobID, fileCount) {
     return preferences.has(jobID) ? preferences.get(jobID) : fileCount === 1;
+  }
+
+  function selectionTouchesNode(node, selection) {
+    if (!node || !selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+    return node.contains(selection.anchorNode) || node.contains(selection.focusNode);
   }
 
   async function chooseDelete(job) {
@@ -164,6 +171,24 @@
 
   function render(jobs) {
     const list = document.getElementById("jobList");
+    const selection = typeof root.getSelection === "function" ? root.getSelection() : null;
+    if (selectionTouchesNode(list, selection)) {
+      if (!renderDeferredForSelection) {
+        console.debug("DownKit job refresh deferred while text is selected", {
+          timestamp: new Date().toISOString(), severity: "DEBUG",
+          node: "job-list", operation: "jobs.render", result: "deferred-selection"
+        });
+      }
+      renderDeferredForSelection = true;
+      return false;
+    }
+    if (renderDeferredForSelection) {
+      console.debug("DownKit job refresh resumed after text selection ended", {
+        timestamp: new Date().toISOString(), severity: "DEBUG",
+        node: "job-list", operation: "jobs.render", result: "resumed"
+      });
+      renderDeferredForSelection = false;
+    }
     const template = document.getElementById("jobTemplate");
     list.replaceChildren();
     document.getElementById("emptyJobs").hidden = jobs.length > 0;
@@ -235,12 +260,16 @@
       });
       list.appendChild(node);
     }
+    return true;
   }
 
   async function refresh() {
     try {
       const response = await api.send("bridge.jobs.list");
-      render(response.jobs || []);
+      const jobs = response.jobs || [];
+      const snapshot = JSON.stringify(jobs);
+      if (snapshot === lastRenderedJobs) return;
+      if (render(jobs)) lastRenderedJobs = snapshot;
     } catch (error) {
       api.setMessage("jobsMessage", error.message || String(error), "error");
     }
@@ -272,6 +301,6 @@
 
   root.DownKitJobs = { init, activate, deactivate, refresh, render, formatBytes, formatSpeed, totalSpeed };
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { formatBytes, formatSpeed, totalSpeed, fileName, jobFiles, fileSectionExpanded };
+    module.exports = { formatBytes, formatSpeed, totalSpeed, fileName, jobFiles, fileSectionExpanded, selectionTouchesNode };
   }
 })(globalThis);

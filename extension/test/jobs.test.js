@@ -31,6 +31,18 @@ expansionPreferences.set("single", false);
 assert.equal(jobs.fileSectionExpanded(expansionPreferences, "single", 1), false);
 expansionPreferences.set("playlist", true);
 assert.equal(jobs.fileSectionExpanded(expansionPreferences, "playlist", 2), true);
+const selectedNode = {};
+const outsideNode = {};
+const container = { contains: node => node === selectedNode };
+assert.equal(jobs.selectionTouchesNode(container, {
+  isCollapsed: false, rangeCount: 1, anchorNode: selectedNode, focusNode: selectedNode
+}), true);
+assert.equal(jobs.selectionTouchesNode(container, {
+  isCollapsed: true, rangeCount: 1, anchorNode: selectedNode, focusNode: selectedNode
+}), false);
+assert.equal(jobs.selectionTouchesNode(container, {
+  isCollapsed: false, rangeCount: 1, anchorNode: outsideNode, focusNode: outsideNode
+}), false);
 
 const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../popup/jobs.js"), "utf8");
 assert.match(source, /resolving:\s*"解析中"/);
@@ -46,5 +58,7 @@ assert.match(source, /删除记录和文件/);
 assert.match(source, /filesStatus\.textContent = completed === files\.length \? "全部完成"/);
 assert.match(source, /fileNode\.classList\.add\(stateKey\)/);
 assert.match(source, /fileExpansionPreferences\.set\(job\.id, willExpand\)/);
+assert.match(source, /deferred while text is selected/);
+assert.match(source, /snapshot === lastRenderedJobs/);
 
 console.log("extension jobs tests passed");

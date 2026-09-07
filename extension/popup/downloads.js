@@ -85,6 +85,15 @@
     return quality ? quality.value : "";
   }
 
+  function siteLanguageSelectors(language) {
+    const normalized = String(language || "").trim().toLowerCase();
+    if (!normalized || normalized === "auto") return ["all", "-live_chat"];
+    // Bilibili exposes AI captions as ai-zh, ai-en, etc. yt-dlp lists these
+    // as regular subtitles, so --write-auto-subs alone does not make zh.* or
+    // en.* match the corresponding AI caption track.
+    return [`${normalized}.*`, `ai-${normalized}.*`, normalized];
+  }
+
   function selectedSubtitleRequest(source) {
     const controls = source || document;
     const select = controls.getElementById("subtitleMode");
@@ -93,10 +102,10 @@
     let request;
     switch (select ? select.value : "none") {
       case "site-zh":
-        request = { mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best" };
+        request = { mode: "site", languages: ["zh.*", "ai-zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best" };
         break;
       case "site-en":
-        request = { mode: "site", languages: ["en.*"], includeAutomatic: true, format: "best" };
+        request = { mode: "site", languages: ["en.*", "ai-en.*"], includeAutomatic: true, format: "best" };
         break;
       case "site-all":
         request = { mode: "site", languages: ["all", "-live_chat"], includeAutomatic: true, format: "best" };
@@ -104,7 +113,7 @@
       case "site-or-asr":
         request = {
           mode: "site-or-asr",
-          languages: asrLanguage === "auto" ? ["all", "-live_chat"] : [`${asrLanguage}.*`, asrLanguage],
+          languages: siteLanguageSelectors(asrLanguage),
           includeAutomatic: true,
           format: "best",
           asrLanguage
@@ -156,6 +165,11 @@
     try {
       const quality = selectedQuality();
       const subtitles = selectedSubtitleRequest();
+      console.debug("DownKit subtitle request prepared", {
+        timestamp: new Date().toISOString(), severity: "DEBUG",
+        node: "popup-download", operation: "subtitle.request.build",
+        result: subtitles.mode, languages: subtitles.languages || []
+      });
       const probe = await api.send("media.playlist.probe", { resource, page, quality });
       const playlist = await root.DownKitPlaylistDialog.choose(probe);
       if (!playlist) {
@@ -211,6 +225,6 @@
 
   root.DownKitDownloads = { init, activate, deactivate };
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { selectedQuality, selectedSubtitleRequest, syncSubtitleOptionsVisibility, copyText };
+    module.exports = { selectedQuality, siteLanguageSelectors, selectedSubtitleRequest, syncSubtitleOptionsVisibility, copyText };
   }
 })(globalThis);

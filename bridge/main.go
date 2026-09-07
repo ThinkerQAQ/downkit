@@ -1050,6 +1050,10 @@ func (a *app) downloadResolvedPage(pageURL string) ([]MediaOutput, error) {
 	_ = os.Remove(subtitleRecord)
 	publishJobPhaseProgress("resolving", 100, "解析完成", 0, 0, 0)
 	publishJobPhaseProgress("downloading", 0, "准备下载页面媒体", 0, 0, 0)
+	if a.opts.subtitleRequest.usesSiteSubtitles() {
+		fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=site-subtitles operation=download-with-media status=start languages=%q includeAutomatic=%t format=%s\n",
+			time.Now().Format(time.RFC3339), a.opts.subtitleRequest.Languages, a.opts.subtitleRequest.IncludeAutomatic, a.opts.subtitleRequest.Format)
+	}
 	for i, attempt := range attempts {
 		if i > 0 {
 			mode := "直连"
@@ -1069,6 +1073,10 @@ func (a *app) downloadResolvedPage(pageURL string) ([]MediaOutput, error) {
 			artifacts, readErr := readYTDLPSubtitleArtifacts(subtitleRecord, outputs, a.opts.outputDir)
 			if readErr != nil {
 				return nil, readErr
+			}
+			if a.opts.subtitleRequest.usesSiteSubtitles() {
+				fmt.Fprintf(consoleOut, "timestamp=%s level=INFO node=site-subtitles operation=download-with-media status=completed artifactCount=%d\n",
+					time.Now().Format(time.RFC3339), len(artifacts))
 			}
 			for artifactIndex := range artifacts {
 				for outputIndex := range outputs {

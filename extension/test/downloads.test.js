@@ -10,8 +10,13 @@ function controls(values) {
 
 assert.equal(downloads.selectedQuality({ getElementById: () => null }), "");
 assert.equal(downloads.selectedQuality({ getElementById: () => ({ value: "1080" }) }), "1080");
+assert.deepEqual(downloads.siteLanguageSelectors("zh"), ["zh.*", "ai-zh.*", "zh"]);
+assert.deepEqual(downloads.siteLanguageSelectors("auto"), ["all", "-live_chat"]);
 assert.deepEqual(downloads.selectedSubtitleRequest(controls({ subtitleMode: "site-zh" })), {
-  mode: "site", languages: ["zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best"
+  mode: "site", languages: ["zh.*", "ai-zh.*", "zh-Hans", "zh-Hant"], includeAutomatic: true, format: "best"
+});
+assert.deepEqual(downloads.selectedSubtitleRequest(controls({ subtitleMode: "site-en" })), {
+  mode: "site", languages: ["en.*", "ai-en.*"], includeAutomatic: true, format: "best"
 });
 assert.deepEqual(downloads.selectedSubtitleRequest({ getElementById: () => null }), { mode: "none" });
 assert.deepEqual(downloads.selectedSubtitleRequest(controls({ subtitleMode: "asr", asrLanguage: "en" })), {
@@ -20,7 +25,7 @@ assert.deepEqual(downloads.selectedSubtitleRequest(controls({ subtitleMode: "asr
 assert.deepEqual(downloads.selectedSubtitleRequest(controls({
   subtitleMode: "site-or-asr", asrLanguage: "ja", subtitleTargetLanguage: "zh-Hans", subtitleLayout: "bilingual"
 })), {
-  mode: "site-or-asr", languages: ["ja.*", "ja"], includeAutomatic: true, format: "best",
+  mode: "site-or-asr", languages: ["ja.*", "ai-ja.*", "ja"], includeAutomatic: true, format: "best",
   asrLanguage: "ja", targetLanguage: "zh-Hans", bilingual: true
 });
 assert.throws(() => downloads.selectedSubtitleRequest(controls({
