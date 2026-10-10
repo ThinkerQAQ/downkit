@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_url_hint">粘贴 MP4 或 HLS（m3u8）媒体地址</string>
+    <string name="paste">粘贴</string>
+    <string name="download">开始下载</string>
+    <string name="mobile_instructions">也可以在浏览器或其他应用中点“分享”，然后选择 DownKit。\n\n当前移动端直接支持 MP4/HLS 媒体地址；普通网页需要扩展先捕获媒体地址。YouTube 常用分离音视频轨，当前移动端尚未支持。</string>
+    <string name="ready_status">已就绪。完成的视频会保存到：下载/DownKit\n\n%1$s</string>
+    <string name="invalid_link">拒绝了无效的媒体 URL。</string>
+    <string name="invalid_shared_link">分享内容中没有有效的 HTTP/HTTPS 地址。</string>
+    <string name="shared_link_received">已接收分享链接。请确认它是 MP4/HLS 媒体地址，然后点“开始下载”。</string>
+    <string name="clipboard_invalid">剪贴板中没有有效的 HTTP/HTTPS 地址。</string>
+    <string name="clipboard_ok">已粘贴媒体地址，请确认后开始下载。</string>
+    <string name="input_invalid">请输入有效的 HTTP/HTTPS 媒体地址</string>
+    <string name="input_invalid_media">请输入有效的 MP4/HLS 媒体地址。</string>
+    <string name="download_dispatched">任务已交给后台下载服务。完成后会保存到：下载/DownKit</string>
+    <string name="notification_channel">媒体下载</string>
+    <string name="preparing_download">正在准备下载…</string>
+    <string name="download_complete_app">下载完成，文件保存在应用目录</string>
+    <string name="download_complete_path">下载完成：%1$s</string>
+    <string name="download_publish_failed">下载完成，但发布到下载目录失败：%1$s</string>
+    <string name="download_failed">下载失败：%1$s</string>
+    <string name="tools_status">组件状态</string>
+    <string name="tools_unavailable">组件状态暂不可用</string>
+</resources>

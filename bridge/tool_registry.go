@@ -34,10 +34,9 @@ type toolConfigOption struct {
 }
 
 type toolConfigView struct {
-	Schema          []toolConfigField `json:"schema"`
-	Values          map[string]any    `json:"values"`
-	Toggle          *toolConfigToggle `json:"toggle,omitempty"`
-	DefaultExpanded bool              `json:"defaultExpanded"`
+	Schema []toolConfigField `json:"schema"`
+	Values map[string]any    `json:"values"`
+	Toggle *toolConfigToggle `json:"toggle,omitempty"`
 }
 
 type toolConfigToggle struct {

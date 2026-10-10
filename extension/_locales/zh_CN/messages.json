@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "DownKit 助手"
+  },
+  "extensionDescription": {
+    "message": "检测当前页面的 HLS、DASH、MP4 和分离媒体轨，并交给 DownKit 下载。"
+  }
+}

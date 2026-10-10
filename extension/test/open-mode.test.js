@@ -12,6 +12,6 @@ assert.equal(manifest.side_panel.default_path, "popup/popup.html");
 assert.match(background, /const DEFAULT_OPEN_MODE = "popup"/);
 assert.match(background, /setPopup\(\{ popup: mode === "popup" \? POPUP_PATH : "" \}\)/);
 assert.match(background, /openPanelOnActionClick: mode === "sidePanel"/);
-assert.match(background, /chrome\.storage\.local\.set\(\{ openMode: mode \}\)/);
+assert.match(background, /bridgeFetch\("\/v1\/preferences"/);
 
 console.log("extension open mode tests passed");

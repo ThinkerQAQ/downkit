@@ -131,6 +131,7 @@ func readBridgeState() (bridgeState, error) {
 }
 
 func runBridge() error {
+	appendRuntimeLog("bridge", "starting")
 	token, err := randomToken()
 	if err != nil {
 		return err
@@ -156,12 +157,15 @@ func runBridge() error {
 	_ = server.persistJobsLocked()
 	server.mu.Unlock()
 	mux := http.NewServeMux()
+	mux.HandleFunc("/console", server.handleConsole)
+	mux.HandleFunc("/console/", server.handleConsole)
 	mux.HandleFunc("/v1/ping", server.handlePing)
 	mux.HandleFunc("/v1/tasks", server.handleTasks)
 	mux.HandleFunc("/v1/playlist/probe", server.handlePlaylistProbe)
 	mux.HandleFunc("/v1/worker/", server.handleWorker)
 	mux.HandleFunc("/v1/environment", server.handleEnvironment)
 	mux.HandleFunc("/v1/config", server.handleConfig)
+	mux.HandleFunc("/v1/preferences", server.handlePreferences)
 	mux.HandleFunc("/v1/tools", server.handleTools)
 	mux.HandleFunc("/v1/tools/yt-dlp/install", server.handleInstallYTDLP)
 	mux.HandleFunc("/v1/tools/whisper/models/install", server.handleInstallWhisperModel)
@@ -194,7 +198,9 @@ func runBridge() error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "Bridge 已就绪：pid=%d address=%s\n", server.state.PID, bridgeAddress)
+	appendRuntimeLog("bridge", "ready")
 	err = httpServer.Serve(listener)
+	appendRuntimeLog("bridge", "stopped")
 	select {
 	case <-restartRequested:
 		command, commandErr := bridgeCommand()
@@ -400,6 +406,7 @@ func sanitizeBrowserCookies(values []browserCookie) []browserCookie {
 }
 
 func runWorker(workerToken string) error {
+	appendRuntimeLog("worker", "start")
 	if len(workerToken) != 64 {
 		return errors.New("invalid worker token")
 	}
@@ -419,6 +426,7 @@ func runWorker(workerToken string) error {
 	reportJobState(payload.JobID, "running", "")
 	opts, err := optionsFromBridgeTask(payload.Task, payload.Config)
 	if err != nil {
+		appendRuntimeLog("worker", "failed")
 		reportJobState(payload.JobID, "failed", err.Error())
 		return err
 	}
@@ -429,9 +437,11 @@ func runWorker(workerToken string) error {
 	beginJobReporting(payload.JobID)
 	err = runWithOptions(opts, nil)
 	if err != nil {
+		appendRuntimeLog("worker", "failed")
 		reportJobState(payload.JobID, "failed", err.Error())
 		return err
 	}
+	appendRuntimeLog("worker", "completed")
 	reportJobState(payload.JobID, "completed", "")
 	return nil
 }
@@ -576,6 +586,15 @@ func (s *bridgeServer) handleConfig(response http.ResponseWriter, request *http.
 		if decodeBridgeJSON(response, request, &config) != nil {
 			return
 		}
+		s.mu.Lock()
+		config.OpenMode = s.config.OpenMode
+		config.UILanguage = s.config.UILanguage
+		config.DetectHls = s.config.DetectHls
+		config.DetectDash = s.config.DetectDash
+		config.DetectMp4 = s.config.DetectMp4
+		config.LogEnabled = s.config.LogEnabled
+		config.LogMaxMB = s.config.LogMaxMB
+		s.mu.Unlock()
 		normalized, err := normalizeBridgeConfig(config)
 		if err != nil {
 			writeJSON(response, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})

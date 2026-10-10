@@ -20,7 +20,7 @@ class DownloadService : Service() {
         MobileLog.info("service", "download-service", "create", "start")
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "媒体下载", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_ID, getString(R.string.notification_channel), NotificationManager.IMPORTANCE_LOW)
         )
     }
 
@@ -34,7 +34,7 @@ class DownloadService : Service() {
         val requestId = runCatching { JSONObject(task).optString("requestId") }.getOrDefault("unknown")
         val queuedAt = SystemClock.elapsedRealtime()
         MobileLog.info(requestId, "download-service", "start-command", "accepted", null, "startId" to startId)
-        startForeground(NOTIFICATION_ID, notification("正在准备下载…", true))
+        startForeground(NOTIFICATION_ID, notification(getString(R.string.preparing_download), true))
         MobileLog.info(requestId, "download-service", "start-foreground", "ready")
         executor.execute {
             val startedAt = System.currentTimeMillis()
@@ -66,10 +66,10 @@ class DownloadService : Service() {
                         if (location == null) "skipped" else "succeeded",
                         SystemClock.elapsedRealtime() - publishStartedAt,
                     )
-                    if (location == null) "下载完成，文件保存在应用目录" else "下载完成：$location"
+                    if (location == null) getString(R.string.download_complete_app) else getString(R.string.download_complete_path, location)
                 } catch (error: Throwable) {
                     MobileLog.error(requestId, "download-service", "publish-media", "failed", error)
-                    "下载完成，但发布到下载目录失败：${MobileLog.safeErrorMessage(error)}"
+                    getString(R.string.download_publish_failed, MobileLog.safeErrorMessage(error))
                 }
                 notify(message)
                 MobileLog.info(requestId, "download-service", "completion-notification", "posted")
@@ -82,7 +82,7 @@ class DownloadService : Service() {
                     error,
                     SystemClock.elapsedRealtime() - executionStartedAt,
                 )
-                notify("下载失败：${MobileLog.safeErrorMessage(error)}")
+                notify(getString(R.string.download_failed, MobileLog.safeErrorMessage(error)))
             } finally {
                 stopForeground(STOP_FOREGROUND_DETACH)
                 stopSelf(startId)

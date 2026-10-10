@@ -63,7 +63,9 @@
   }
 
   async function refreshMedia() {
-    [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    [activeTab] = api.host === "web"
+      ? [ (await api.send("ui.active-tab")).tab ]
+      : await chrome.tabs.query({ active: true, currentWindow: true });
     if (!activeTab || !activeTab.id) throw new Error("找不到当前标签页");
     const response = await api.send("media.list", { tabId: activeTab.id });
     page = response.page;
@@ -204,6 +206,7 @@
       items = [];
       renderMedia();
     });
+    if (api.host === "web") return;
     chrome.tabs.onActivated.addListener(scheduleMediaRefresh);
     chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
       if (activeTab && tabId === activeTab.id && (changeInfo.url || changeInfo.status === "complete")) {
@@ -214,7 +217,21 @@
 
   async function activate() {
     active = true;
-    await refreshMedia().catch(error => api.setMessage("downloadMessage", error.message || String(error), "error"));
+    try {
+      await refreshMedia();
+      api.setMessage("downloadMessage", "");
+    } catch (error) {
+      const message = error.message || String(error);
+      if (/No browser media tab available|找不到当前标签页/.test(message)) {
+        activeTab = null;
+        items = [];
+        document.getElementById("pageTitle").textContent = "等待打开视频页面";
+        renderMedia();
+        api.setMessage("downloadMessage", "");
+        return;
+      }
+      api.setMessage("downloadMessage", message, "error");
+    }
   }
 
   function deactivate() {

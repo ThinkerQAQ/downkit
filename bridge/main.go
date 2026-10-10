@@ -261,10 +261,19 @@ func runWithOptions(opts options, platformMuxer mediaMuxer) error {
 	if err := os.MkdirAll(opts.outputDir, 0o755); err != nil {
 		return err
 	}
-	workRoot := filepath.Join(opts.outputDir, ".downkit-work")
 	workName := fmt.Sprintf("job_%s_%d", time.Now().Format("20060102_150405"), os.Getpid())
 	if opts.jobID != "" {
 		workName = "job_" + opts.jobID
+	}
+	// Desktop staging lives under Data/work. Existing job checkpoints may
+	// still be resumed from their pre-migration output directory.
+	workRoot := filepath.Join(opts.outputDir, ".downkit-work")
+	if platformMuxer == nil {
+		if dataWork, err := bridgeDataPath("work"); err == nil {
+			if _, err := os.Stat(filepath.Join(workRoot, workName)); err != nil {
+				workRoot = dataWork
+			}
+		}
 	}
 	workDir := filepath.Join(workRoot, workName)
 	segmentDir := filepath.Join(workDir, "segments")
@@ -804,6 +813,9 @@ func findTool(preferred, name string) (string, error) {
 	if executable, err := os.Executable(); err == nil {
 		executableDir := filepath.Dir(executable)
 		toolDirectories := toolInstallDirectories(filepath.Join(executableDir, "tools"), name)
+		if strings.EqualFold(filepath.Base(executableDir), "bin") {
+			toolDirectories = append(toolDirectories, toolInstallDirectories(filepath.Join(filepath.Dir(executableDir), "tools"), name)...)
+		}
 		toolDirectories = append(toolDirectories, executableDir)
 		candidates := make([]string, 0, len(toolNames)*len(toolDirectories))
 		for _, toolDir := range toolDirectories {

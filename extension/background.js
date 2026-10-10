@@ -6,7 +6,6 @@ const requestMeta = new Map();
 const tabQueues = new Map();
 const DEFAULT_OPEN_MODE = "popup";
 const POPUP_PATH = "popup/popup.html";
-const MEDIA_SNIFFER_CONFIG_KEY = "mediaSnifferConfig";
 let currentOpenMode = DEFAULT_OPEN_MODE;
 let currentMediaSnifferConfig = DownKitMedia.normalizeSnifferConfig();
 
@@ -14,16 +13,17 @@ function hasEnabledMediaType(config) {
   return Boolean(config.detectHls || config.detectDash || config.detectMp4);
 }
 
-const mediaSnifferConfigReady = chrome.storage.local.get(MEDIA_SNIFFER_CONFIG_KEY)
-  .then(result => {
-    const stored = DownKitMedia.normalizeSnifferConfig(result[MEDIA_SNIFFER_CONFIG_KEY]);
-    currentMediaSnifferConfig = hasEnabledMediaType(stored)
-      ? stored
-      : DownKitMedia.normalizeSnifferConfig();
+// Data/config.toml is the sole source of persisted preferences.
+// Only per-tab media detections live in browser session storage.
+const preferencesReady = bridgeFetch("/v1/preferences").then(result => result.preferences);
+
+const mediaSnifferConfigReady = preferencesReady
+  .then(preferences => {
+    currentMediaSnifferConfig = DownKitMedia.normalizeSnifferConfig(preferences);
     return currentMediaSnifferConfig;
   })
   .catch(error => {
-    console.warn("[media-sniffer] 读取配置失败，使用默认检测范围", error);
+    console.warn("[media-sniffer] TOML preferences unavailable", error);
     return currentMediaSnifferConfig;
   });
 
@@ -40,16 +40,13 @@ async function applyOpenMode(value) {
   return mode;
 }
 
-const openModeReady = chrome.storage.local.get("openMode")
-  .then(result => applyOpenMode(result.openMode))
+const openModeReady = preferencesReady
+  .then(preferences => applyOpenMode(preferences.openMode))
   .catch(error => {
     console.warn(error);
     return applyOpenMode(DEFAULT_OPEN_MODE);
   })
-  .then(mode => {
-    currentOpenMode = mode;
-    return mode;
-  });
+  .then(mode => { currentOpenMode = mode; return mode; });
 
 function headersToContext(headers) {
   const context = {};
@@ -198,22 +195,6 @@ async function submitBridgeTask(resource, page, quality, playlist, subtitles) {
   });
 }
 
-function nativeHostTool(health) {
-  return {
-    name: "native-host",
-    displayName: "Native Messaging Host",
-    kind: "runtime",
-    description: "由浏览器启动并连接 DownKit Bridge。",
-    platforms: ["windows", "linux", "darwin"],
-    delivery: "bundled",
-    required: true,
-    capabilities: ["bridge.launch"],
-    sortOrder: 10,
-    config: { schema: [], values: {}, defaultExpanded: false },
-    health
-  };
-}
-
 function mediaSnifferTool() {
   const config = DownKitMedia.normalizeSnifferConfig(currentMediaSnifferConfig);
   const enabledLabels = [
@@ -239,7 +220,6 @@ function mediaSnifferTool() {
         { key: "detectMp4", label: "MP4 直链", type: "boolean", description: "检测 mp4 URL 或 video/mp4 响应。" }
       ],
       values: config,
-      defaultExpanded: false
     },
     health: {
       status: "ready",
@@ -250,138 +230,71 @@ function mediaSnifferTool() {
   };
 }
 
-function offlineBridgeTool(detail) {
+// Native Messaging is the transport used to reach the Bridge, not a second
+// independently configurable runtime. Show one local-service status while
+// retaining distinct transport and server failure details for diagnostics.
+function offlineBridgeTool(layer, detail) {
   return {
     name: "bridge",
-    displayName: "DownKit Bridge",
+    displayName: "本地服务",
     kind: "runtime",
-    description: "连接浏览器与本地下载引擎的服务。",
+    description: "浏览器原生连接与 DownKit 下载服务。",
     platforms: ["windows", "linux", "darwin"],
     delivery: "bundled",
     required: true,
-    capabilities: ["task.submit", "job.manage", "config.persist"],
+    capabilities: ["bridge.launch", "task.submit", "job.manage", "config.persist"],
     sortOrder: 20,
-    config: { schema: [], values: {}, defaultExpanded: false },
+    config: { schema: [], values: {} },
     health: {
       status: "error",
       ok: false,
-      summary: "Bridge 不可访问",
-      detail: `Native Host 连接失败，扩展无法取得 Bridge 会话 token。${detail ? ` ${String(detail)}` : ""}`
+      summary: "本地服务不可用",
+      detail: `${layer}：${String(detail || "连接失败")}`
     }
   };
 }
 
-function legacyToolSnapshot(environment, config) {
-  const executableHealth = (status, missingSummary) => status && status.available ? {
-    status: "ready", ok: true, summary: "组件就绪", version: status.version || "", path: status.path || ""
-  } : {
-    status: "missing", ok: false, summary: missingSummary, detail: status && status.error || "未找到"
-  };
-  return [
-    {
-      name: "bridge", displayName: "DownKit Bridge", kind: "runtime",
-      description: "连接浏览器与本地下载引擎的服务。", platforms: ["windows", "linux", "darwin"],
-      delivery: "bundled", required: true, sortOrder: 20,
-      config: { schema: [{ key: "address", label: "监听地址", type: "string", readOnly: true }], values: { address: "自动发现" }, defaultExpanded: false },
-      health: { status: "ready", ok: true, summary: "Bridge 在线", version: environment.version || "", detail: `PID ${environment.pid || "?"} · ${environment.platform || ""}`, path: environment.executable || "" }
-    },
-    {
-	  name: "network-proxy", displayName: "网络代理", kind: "infra",
-	  description: "统一配置 Bridge 发起的外网请求；本机控制通信保持直连。", platforms: ["windows", "linux", "darwin"],
-	  delivery: "bundled", required: false, sortOrder: 25,
-	  config: {
-		toggle: { key: "proxyEnabled", label: "启用代理", description: "关闭后保留代理地址，Bridge 外网请求改为直连。" },
-		schema: [
-		  { key: "proxyHost", label: "代理主机", type: "string", placeholder: "例如 127.0.0.1", description: "只填写域名或 IP，不要包含 http:// 或端口。" },
-		  { key: "proxyPort", label: "代理端口", type: "integer", min: 1, max: 65535, description: "主机和端口都留空表示直连。" }
-		],
-		values: { proxyEnabled: config.proxyEnabled ?? Boolean(config.proxyHost), proxyHost: config.proxyHost || "", proxyPort: config.proxyPort || "" }, defaultExpanded: false
-	  },
-	  health: { status: (config.proxyEnabled ?? Boolean(config.proxyHost)) ? "checking" : "disabled", ok: true, summary: (config.proxyEnabled ?? Boolean(config.proxyHost)) ? "等待代理检测" : "未启用 · Bridge 外网直连" }
-	},
-	{
-      name: "go-downloader", displayName: "Go 下载引擎", kind: "capability",
-      description: "负责清单解析、分片下载、解密和断点续传。", platforms: ["windows", "linux", "darwin", "android", "ios"],
-      delivery: "bundled", required: true, sortOrder: 30,
-      actions: [{ id: "open-output", label: "打开下载目录", description: "在文件管理器中打开当前下载目录。" }],
-      config: {
-        schema: [
-          { key: "outputDir", label: "下载目录", type: "directory" },
-          { key: "concurrent", label: "下载并发上限", type: "integer", min: 1, max: 64, description: "统一控制 HLS 分片、MP4 Range 和 yt-dlp 分片的最大并发数。" },
-          { key: "quality", label: "默认清晰度", type: "select", options: [
-            { value: "", label: "有多个时询问" },
-            { value: "best", label: "最高" },
-            { value: "1080", label: "1080p" },
-            { value: "720", label: "720p" },
-            { value: "480", label: "480p" }
-          ] }
-        ],
-		values: { outputDir: config.outputDir || "", concurrent: config.concurrent || 12, quality: config.quality || "" },
-        defaultExpanded: false
-      },
-      health: { status: "ready", ok: true, summary: "下载引擎就绪" }
-    },
-    {
-      name: "ffmpeg", displayName: "FFmpeg Slim", kind: "dependency",
-      description: "无损封装 HLS、TS、fMP4 及分离音视频轨。", platforms: ["windows", "linux", "darwin"],
-      delivery: "bundled-sidecar", required: false, sortOrder: 40,
-      config: { schema: [{ key: "ffmpegPath", label: "程序路径", type: "file", placeholder: "请输入程序完整路径", description: "自动检测失败时，请指定可信的程序文件。" }], values: { ffmpegPath: config.ffmpegPath || "" }, defaultExpanded: false },
-      health: executableHealth(environment.ffmpeg, "组件未找到")
-    },
-    {
-      name: "yt-dlp", displayName: "yt-dlp", kind: "dependency",
-      description: "按需解析来源页面和通用媒体站点。", platforms: ["windows", "linux", "darwin"],
-      delivery: "on-demand", required: false, sortOrder: 50,
-      config: { schema: [{ key: "ytDlpPath", label: "程序路径", type: "file", placeholder: "请输入程序完整路径", description: "自动检测失败时，请指定可信的程序文件。" }], values: { ytDlpPath: config.ytDlpPath || "" }, defaultExpanded: false },
-      health: executableHealth(environment.ytDlp, "组件未找到")
+function localServiceTool(bridge) {
+  const health = bridge.health || {};
+  return {
+    ...bridge,
+    displayName: "本地服务",
+    description: "浏览器原生连接与 DownKit 下载服务。",
+    health: {
+      ...health,
+      summary: health.ok ? "浏览器与下载服务连接正常" : (health.summary || "本地服务不可用"),
+      detail: ["Native Messaging 已连接", health.detail].filter(Boolean).join(" · ")
     }
-  ];
+  };
 }
 
 async function bridgeToolsSnapshot() {
   await mediaSnifferConfigReady;
-  let session;
   try {
-    session = await ensureBridge(false);
+    await ensureBridge(false);
   } catch (error) {
-    const detail = error.message || String(error);
     return {
       ok: true,
       version: 1,
-      tools: [
-        nativeHostTool({ status: "error", ok: false, summary: "Native Host 不可用", detail }),
-        mediaSnifferTool(),
-        offlineBridgeTool(detail)
-      ]
+      tools: [mediaSnifferTool(), offlineBridgeTool("浏览器原生连接失败", error.message || String(error))]
     };
   }
 
-  const native = nativeHostTool({
-    status: "ready", ok: true, summary: "Native Host 已连接",
-    detail: "浏览器原生通道正常"
-  });
   const sniffer = mediaSnifferTool();
   try {
     const result = await bridgeFetch("/v1/tools");
-    return { ...result, ok: true, tools: [native, sniffer, ...(result.tools || [])] };
+    return {
+      ...result,
+      ok: true,
+      tools: [sniffer, ...(result.tools || []).map(tool =>
+        tool.name === "bridge" ? localServiceTool(tool) : tool)]
+    };
   } catch (error) {
-    try {
-      const [environmentResult, configResult] = await Promise.all([
-        bridgeFetch("/v1/environment"), bridgeFetch("/v1/config")
-      ]);
-      return {
-        ok: true,
-        version: 1,
-        legacy: true,
-        tools: [native, sniffer, ...legacyToolSnapshot(environmentResult.environment || {}, configResult.config || {})]
-      };
-    } catch (_) {
-      return {
-        ok: true,
-        version: 1,
-        tools: [native, sniffer, offlineBridgeTool(error.message || String(error))]
-      };
-    }
+    return {
+      ok: true,
+      version: 1,
+      tools: [sniffer, offlineBridgeTool("下载服务连接失败", error.message || String(error))]
+    };
   }
 }
 
@@ -483,6 +396,33 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
 
+  if (message.action === "ui.language.get") {
+    bridgeFetch("/v1/preferences")
+      .then(result => sendResponse({ ok: true, locale: result.preferences.uiLanguage }),
+        error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "ui.language.set") {
+    const locale = message.locale === "en" ? "en" : "zh-CN";
+    bridgeFetch("/v1/preferences", { method: "PUT", body: JSON.stringify({ uiLanguage: locale }) })
+      .then(() => sendResponse({ ok: true, locale }),
+        error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
+  if (message.action === "ui.active-tab") {
+    chrome.tabs.query({})
+      .then(tabs => {
+        const candidates = tabs.filter(tab => /^https?:\/\//.test(tab.url || "") &&
+          !String(tab.url).startsWith("http://127.0.0.1:17891/console/"));
+        const current = candidates.find(tab => tab.active && tab.lastFocusedWindow) ||
+          candidates.find(tab => tab.active) || candidates[0];
+        sendResponse(current ? { ok: true, tab: { id: current.id, title: current.title, url: current.url } } :
+          { ok: false, error: "No browser media tab available" });
+      }, error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
   if (message.action === "ui.open-mode.get") {
     openModeReady
       .then(() => sendResponse({ ok: true, mode: currentOpenMode, supportsSidePanel: Boolean(chrome.sidePanel) }), error => sendResponse({ ok: false, error: error.message || String(error) }));
@@ -492,7 +432,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "ui.open-mode.set") {
     openModeReady
       .then(() => applyOpenMode(message.mode))
-      .then(mode => chrome.storage.local.set({ openMode: mode }).then(() => mode))
+      .then(mode => bridgeFetch("/v1/preferences", {
+        method: "PUT", body: JSON.stringify({ openMode: mode })
+      }).then(() => mode))
       .then(mode => {
         currentOpenMode = mode;
         sendResponse({ ok: true, mode, supportsSidePanel: Boolean(chrome.sidePanel) });
@@ -613,14 +555,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: false, error: "至少保留一种媒体检测类型" });
       return;
     }
-    chrome.storage.local.set({ [MEDIA_SNIFFER_CONFIG_KEY]: next })
+    bridgeFetch("/v1/preferences", { method: "PUT", body: JSON.stringify(next) })
       .then(async () => {
         currentMediaSnifferConfig = next;
         requestMeta.clear();
         await refreshMediaBadges();
-        return next;
-      })
-      .then(config => sendResponse({ ok: true, config }), error => sendResponse({ ok: false, error: error.message || String(error) }));
+        sendResponse({ ok: true, config: next });
+      }, error => sendResponse({ ok: false, error: error.message || String(error) }));
     return true;
   }
 

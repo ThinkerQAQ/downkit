@@ -42,20 +42,31 @@ assert.equal(environment.toggleMetadata({ config: { toggle: { key: "enabled", la
 assert.equal(environment.toggleMetadata({ config: {} }), null);
 
 const environmentSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "../popup/environment.js"), "utf8");
-assert.match(environmentSource, /tool\.config && tool\.config\.defaultExpanded/);
+assert.match(environmentSource, /navigation\.push\(\{ type: "edit", id: tool\.name \}\)/);
+assert.match(environmentSource, /navigation\.pop\(\)/);
+assert.match(environmentSource, /settings-heading|settingsHeading/);
+assert.doesNotMatch(environmentSource, /defaultExpanded/);
 assert.doesNotMatch(environmentSource, /tool\.name === "go-downloader"/);
 assert.doesNotMatch(environmentSource, /dependencyNeedsAttention|hasRecoveryAction/);
 
 const backgroundSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "../background.js"), "utf8");
-assert.match(backgroundSource, /name: "network-proxy"/);
-assert.match(backgroundSource, /key: "proxyHost"/);
-assert.match(backgroundSource, /key: "proxyPort"/);
-assert.match(backgroundSource, /key: "proxyEnabled"/);
+
+
+
+
 assert.match(backgroundSource, /name: "media-sniffer"/);
+assert.match(backgroundSource, /const result = await bridgeFetch\("\/v1\/tools"\)/);
+assert.match(backgroundSource, /function localServiceTool\(bridge\)/);
+assert.match(backgroundSource, /displayName: "本地服务"/);
+assert.doesNotMatch(backgroundSource, /function nativeHostTool\(/);
+assert.doesNotMatch(backgroundSource, /name: "native-host"/);
+assert.match(backgroundSource, /offlineBridgeTool\("浏览器原生连接失败"/);
+assert.match(backgroundSource, /offlineBridgeTool\("下载服务连接失败"/);
 assert.match(backgroundSource, /key: "detectHls"/);
 assert.match(backgroundSource, /key: "detectDash"/);
 assert.match(backgroundSource, /key: "detectMp4"/);
-assert.match(backgroundSource, /MEDIA_SNIFFER_CONFIG_KEY/);
+assert.doesNotMatch(backgroundSource, /MEDIA_SNIFFER_CONFIG_KEY|legacyToolSnapshot/);
+assert.match(backgroundSource, /preferencesReady = bridgeFetch\("\/v1\/preferences"\)/);
 assert.match(backgroundSource, /v1\/tools\/whisper\/models\/install/);
 assert.match(backgroundSource, /v1\/tools\/llama\/models\/install/);
 assert.match(backgroundSource, /model: String\(message\.model/);

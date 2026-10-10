@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
-	"strings"
 	"testing"
 )
 
@@ -50,18 +49,6 @@ func TestDesktopToolsOwnTheirConfigSchema(t *testing.T) {
 	}
 	if byName["go-downloader"].Kind != "capability" {
 		t.Fatalf("downloader kind = %q", byName["go-downloader"].Kind)
-	}
-	for _, item := range items {
-		if item.Config.DefaultExpanded {
-			t.Fatalf("tool %q should be collapsed by default", item.Name)
-		}
-		encoded, err := json.Marshal(item.Config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(encoded), `"defaultExpanded":false`) {
-			t.Fatalf("tool %q config does not publish its collapsed default: %s", item.Name, encoded)
-		}
 	}
 	if len(byName["go-downloader"].Actions) != 1 || byName["go-downloader"].Actions[0].ID != "open-output" {
 		t.Fatalf("missing downloader open-output action: %#v", byName["go-downloader"].Actions)

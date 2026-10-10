@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "DownKit Assistant"
+  },
+  "extensionDescription": {
+    "message": "Detect HLS, DASH, MP4, and separate media tracks on web pages and download them with DownKit."
+  }
+}

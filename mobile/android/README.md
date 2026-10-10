@@ -39,11 +39,12 @@ $env:ANDROID_NDK_HOME = 'C:\path\to\Android\Sdk\ndk\<version>'
 $mobileVersion = 'v0.0.0-20240326195318-268e6c3a80d1'
 go install "golang.org/x/mobile/cmd/gomobile@$mobileVersion"
 go install "golang.org/x/mobile/cmd/gobind@$mobileVersion"
-.\mobile\android\build-android.ps1
+devtool android.build
+# Or directly: go -C tools/downkitdev run . android-build
 ```
 
-脚本会依次生成 arm64 AAR 和 debug APK，并复制到
-`dist/downkit-android-arm64-debug.apk`。Android 10 及以上下载完成后会通过 MediaStore
+Go 维护工具依次生成 arm64 AAR 和 debug APK，并复制到
+`.devtool/artifacts/android/downkit-android-arm64-debug.apk`。Android 10 及以上下载完成后会通过 MediaStore
 发布到公共的 `下载/DownKit` 目录，不申请宽泛的存储权限；较旧系统暂时保存在应用专属目录。
 
 ## 已知边界

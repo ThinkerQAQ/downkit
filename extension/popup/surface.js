@@ -12,7 +12,8 @@
     }
   }
 
-  const surface = detectSurface(root.chrome, root);
+  const surface = root.location?.origin === "http://127.0.0.1:17891" &&
+    root.location?.pathname.startsWith("/console/") ? "web" : detectSurface(root.chrome, root);
   if (root.document && root.document.documentElement) {
     root.document.documentElement.dataset.surface = surface;
     root.console.debug("DownKit UI surface detected", {
