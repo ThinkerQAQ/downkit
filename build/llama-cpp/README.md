@@ -7,10 +7,10 @@ without embedding it into the Bridge executable.
 Provision the pinned official server with:
 
 ```powershell
-.\build\llama-cpp\install-windows.ps1
+go -C tools/downkitdev run . tool-install llama
 ```
 
-The script downloads the official llama.cpp Windows CPU archive, verifies the
+The Go maintainer downloads the official llama.cpp Windows CPU archive, verifies the
 SHA-256 published by GitHub, and copies `llama-server.exe` with its required
 CPU runtime libraries. Translation model files are deliberately excluded:
 TranslateGemma uses the Gemma license, which the user must review separately.

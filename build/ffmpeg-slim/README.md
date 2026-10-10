@@ -5,10 +5,10 @@
 Windows 构建：
 
 ```powershell
-.\build\ffmpeg-slim\build-windows.ps1
+go -C tools/downkitdev run . ffmpeg-native
 ```
 
-只有构建机器直连失败时才传入代理，例如 `-NetworkProxy http://127.0.0.1:11111`。该参数只影响源码和构建依赖下载，不会写入最终程序。
+如果构建机器需要代理，配置标准环境变量 `HTTPS_PROXY` 和 `HTTP_PROXY`；这些环境变量不会写入最终程序。Windows 构建依赖 MSYS2 UCRT64。
 
 默认输出为 `dist\tools\ffmpeg-slim.exe`。DownKit 会按以下顺序发现 FFmpeg：
 
@@ -21,7 +21,7 @@ Windows 构建：
 Linux/macOS 可以准备 FFmpeg 源码和本机编译工具后直接运行：
 
 ```sh
-./build/ffmpeg-slim/build-native.sh /path/to/FFmpeg .build/ffmpeg-slim dist/tools
+go -C tools/downkitdev run . ffmpeg-native --source /path/to/FFmpeg --output dist/tools
 ```
 
 不要把这个文件当作通用 FFmpeg。若未来 yt-dlp 出现新的合并格式，再根据真实失败补一个 demuxer、muxer、parser 或 bitstream filter。

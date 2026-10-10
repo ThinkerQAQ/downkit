@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_url_hint">Paste an MP4 or HLS (m3u8) URL</string>
+    <string name="paste">Paste</string>
+    <string name="download">Download</string>
+    <string name="mobile_instructions">Use Share from your browser or another app and select DownKit.\n\nAndroid supports direct MP4/HLS media URLs; other webpage URLs need media detection first. Split-track videos are not supported.</string>
+    <string name="ready_status">Ready. Completed videos are saved to Downloads/DownKit\n\n%1$s</string>
+    <string name="invalid_link">Invalid media URL.</string>
+    <string name="invalid_shared_link">The shared content contains no valid HTTP/HTTPS URL.</string>
+    <string name="shared_link_received">Link received. Check it is an MP4/HLS media URL and tap Download.</string>
+    <string name="clipboard_invalid">The clipboard contains no valid HTTP/HTTPS URL.</string>
+    <string name="clipboard_ok">Media URL pasted. Check it before downloading.</string>
+    <string name="input_invalid">Enter a valid HTTP/HTTPS media URL</string>
+    <string name="input_invalid_media">Enter a valid MP4/HLS media URL.</string>
+    <string name="download_dispatched">The background download started. Output: Downloads/DownKit</string>
+    <string name="notification_channel">Media downloads</string>
+    <string name="preparing_download">Preparing download…</string>
+    <string name="download_complete_app">Download completed in the app directory</string>
+    <string name="download_complete_path">Download completed: %1$s</string>
+    <string name="download_publish_failed">Download completed, but saving it to Downloads failed: %1$s</string>
+    <string name="download_failed">Download failed: %1$s</string>
+    <string name="tools_status">Component status</string>
+    <string name="tools_unavailable">Component status unavailable</string>
+</resources>

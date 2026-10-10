@@ -1,59 +1,36 @@
 # DownKit
 
-DownKit 是一个通过 Chrome 或 Edge 扩展发现网页中的 M3U8、DASH 和 MP4 媒体，并交给本机 Bridge 下载和封装的跨平台工具。
+[简体中文](README_ZH.md) · [Documentation](docs/index.md) · [Releases](https://github.com/ThinkerQAQ/downkit/releases)
 
-## 字幕能力
+DownKit discovers HLS, DASH, MP4 and split media tracks in Chrome/Edge and downloads them using a local Go Bridge. Desktop downloads support optional subtitle extraction, speech recognition and translation. An independent Android app accepts shared media URLs.
 
-Windows 版支持在下载媒体的同时生成独立字幕文件：
+## Quick Start
 
-- 优先下载网站提供的人工字幕或自动字幕；
-- 原站没有所需字幕时，可使用随发行包提供的 whisper.cpp 客户端在本机识别语音；
-- 可使用随发行包提供的 llama.cpp 和 TranslateGemma 在本机生成译文或双语 SRT；
-- 音频提取、语音识别、模型加载、逐条翻译和字幕生成均显示独立阶段与真实进度。
+Download a [desktop release](https://github.com/ThinkerQAQ/downkit/releases) and extract the complete archive. On Windows run `bin\downkitdev.exe install`; on Linux/macOS run `./bin/downkitdev install`. All installer and release logic is Go-owned. Linux and macOS also require FFmpeg in PATH.
 
-Whisper 和 TranslateGemma 模型权重不包含在发行包内。请在扩展的“工具与配置”中选择模型、阅读相应许可并按需下载；下载完成后无需使用命令行。Linux 和 macOS 发行包目前不携带本地 ASR/翻译 sidecar。
+Open `chrome://extensions` or `edge://extensions`, enable Developer mode and load the unpacked `extension/` folder. Play a video, click DownKit, detect its media and download it. The installed extension starts the Bridge automatically through Native Messaging.
 
-## 使用效果
+## Control surfaces
 
-<table>
-  <tr>
-    <td width="64%"><img src="docs/images/resource-detection.png" alt="DownKit 检测当前网页中的媒体资源"></td>
-    <td width="36%"><img src="docs/images/download-progress.png" alt="DownKit 下载任务进度"></td>
-  </tr>
-  <tr>
-    <td align="center">检测当前页面的媒体资源并发起下载</td>
-    <td align="center">查看实时速度、进度与任务状态</td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center">
-      <img src="docs/images/tool-registry.png" alt="DownKit 工具与配置状态" width="42%"><br>
-      检查 Bridge、下载能力与外部组件状态
-    </td>
-  </tr>
-</table>
+Popup, Side Panel and local **Web UI** share the same task and settings modules. Click **Open workspace** in the extension to access `http://127.0.0.1:17891/console/`. The extension is required for privileged requests; the HTTP page cannot read the Bridge authentication token.
 
-## 安装与使用
+## Capabilities and limitations
 
-Windows、Linux 和 macOS 的整体流程相同：加载浏览器扩展、注册本机 Bridge，然后由浏览器按需自动启动 Bridge；无需手动常驻运行 Bridge。
+- Go desktop downloader with job progress, retry and resume where supported
+- Optional yt-dlp resolver, FFmpeg muxing, whisper.cpp transcription and llama.cpp translation
+- Windows release carries local ASR/translation executables without model weights; Linux/macOS release capabilities differ
+- Android currently accepts direct MP4/HLS URLs; arbitrary webpages and split-track YouTube media are not generally supported on Android
 
-### Windows
+See [Quick Start](docs/quick-start.md), [Tutorial](docs/tutorial/first-download.md), [How-to](docs/how-to/index.md), [Reference](docs/reference/index.md) and [Architecture](docs/architecture/index.md).
 
-1. 从 [GitHub Releases](https://github.com/ThinkerQAQ/downkit/releases) 下载 Windows 发行包并解压到固定目录，不要单独移动 Bridge、`extension` 或 `tools` 目录。
-2. 双击运行 `安装-Windows.cmd`。脚本会注册 Native Messaging Host，使 Chrome 和 Edge 能够自动启动 Bridge。
-3. 打开 `edge://extensions` 或 `chrome://extensions`，启用“开发人员模式”，选择“加载解压缩的扩展”，然后选择发行包中的 `extension` 目录。
-4. 打开包含媒体的网页并开始播放，点击 DownKit 扩展图标，在检测到的资源中选择需要的项目并开始下载。
-5. 如果移动了解压目录或替换了 Bridge，请重新运行 `安装-Windows.cmd`。需要卸载时，先运行 `卸载-Windows.cmd`，再从浏览器中移除扩展。
+## Development
 
-### Linux 和 macOS
+DownKit is managed through DEV2. Start with [AGENTS.md](AGENTS.md), run `devtool config validate` and `devtool project inspect --json`, then use the declared `devtool verify` and `devtool build` commands. Go-owned build and verification commands replace the legacy shell completion gate.
 
-1. 从 [GitHub Releases](https://github.com/ThinkerQAQ/downkit/releases) 下载与系统和 CPU 架构匹配的发行包并解压到固定目录。
-2. Linux 在终端进入解压目录并运行 `./Install-Linux.sh`；macOS 运行 `./Install-macOS.command`。如果系统提示没有执行权限，先执行 `chmod +x Install-Linux.sh` 或 `chmod +x Install-macOS.command`。脚本会自动识别架构并注册 Chrome、Chromium 和 Edge。
-3. Linux/macOS 发布包不携带 FFmpeg，请先通过系统包管理器安装 `ffmpeg` 并确保它在 `PATH` 中，以便完成媒体合并和封装。
-4. 打开 `edge://extensions` 或 `chrome://extensions`，启用“开发人员模式”，选择“加载解压缩的扩展”，然后选择发行包中的 `extension` 目录。
-5. 打开包含媒体的网页并开始播放，点击 DownKit 扩展图标，在检测到的资源中选择需要的项目并开始下载。
+Project code and documentation are Apache-2.0 licensed. Bundled third-party tools carry their own licence terms; see [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-如果移动了解压目录，请重新运行安装脚本。卸载时运行同目录下的 `Uninstall-Linux.sh` 或 `Uninstall-macOS.command`，再从浏览器中移除扩展。
+## Local configuration and data
 
-## 许可证
+Installed binaries reside in `bin/`; local runtime files are stored in the sibling `Data/` directory. Edit `Data/config.toml` for the download, proxy, tools, interface, sniffer and logging settings. Job state (`jobs.json`), Bridge runtime state (`bridge.json`), logs, models, downloaded tool components and staging checkpoints live under `Data/`. Native Messaging requires a JSON registration manifest at `Data/native-host/com.downkit.bridge.json`; it is generated protocol metadata, not a user config file. Existing download destinations remain unchanged when migrating legacy configuration.
 
-DownKit 自有代码和文档采用 [Apache License 2.0](LICENSE)；随项目分发的第三方组件仍遵循各自的许可证，详情见 [NOTICE](NOTICE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+DEVTool delegates to [the Go maintainer](docs/architecture/devtool.md) in `tools/downkitdev/` for release packaging, installation and cross-platform builds. The native Media and Android SDKs keep their upstream build tools.

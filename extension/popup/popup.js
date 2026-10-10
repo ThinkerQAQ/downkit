@@ -7,7 +7,11 @@ function activateTab(name) {
     tab.setAttribute("aria-selected", active ? "true" : "false");
     tab.tabIndex = active ? 0 : -1;
   });
-  document.querySelectorAll("[data-panel]").forEach(panel => panel.classList.toggle("active", panel.dataset.panel === name));
+  document.querySelectorAll("[data-panel]").forEach(panel => {
+    const active = panel.dataset.panel === name;
+    panel.classList.toggle("active", active);
+    panel.hidden = !active;
+  });
   DownKitDownloads.deactivate();
   DownKitJobs.deactivate();
 	if (name === "environment") return DownKitEnvironment.activate();
@@ -47,13 +51,40 @@ async function initOpenMode() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("extensionVersion").textContent = `v${chrome.runtime.getManifest().version}`;
+  document.getElementById("extensionVersion").textContent =
+    DownKitPopup.host === "web" ? "Web UI" : `v${chrome.runtime.getManifest().version}`;
+  const open = document.getElementById("openWorkspace");
+  if (DownKitPopup.host === "web") open.hidden = true;
+  open.addEventListener("click", async () => {
+    try {
+      await DownKitPopup.send("bridge.environment");
+      await chrome.tabs.create({ url: "http://127.0.0.1:17891/console/" });
+    } catch (error) {
+      DownKitPopup.setMessage("environmentMessage", error.message || String(error), "error");
+    }
+  });
+  document.getElementById("refreshWorkspace").addEventListener("click", () => activateTab(
+    document.querySelector(".tab.active")?.dataset.tab || "sniffer"));
+  DownKitI18n.init();
   DownKitEnvironment.init();
   DownKitJobs.init();
   DownKitDownloads.init();
   initOpenMode();
-  document.querySelectorAll("[data-tab]").forEach(tab => tab.addEventListener("click", () => activateTab(tab.dataset.tab)));
-  activateTab("sniffer");
+  const tabs = [...document.querySelectorAll("[data-tab]")];
+  for (const [index, tab] of tabs.entries()) {
+    tab.addEventListener("click", () => activateTab(tab.dataset.tab));
+    tab.addEventListener("keydown", event => {
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 :
+        event.key === "End" ? tabs.length - 1 :
+          (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      activateTab(tabs[next].dataset.tab);
+    });
+  }
+  if (DownKitPopup.host === "web") activateTab("jobs");
+  else activateTab("sniffer");
 });
 
 window.addEventListener("unload", () => {

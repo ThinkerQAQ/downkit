@@ -58,7 +58,7 @@ class MainActivity : Activity() {
             setPadding(0, 8.dp, 0, 20.dp)
         }, matchWidth())
         urlInput = EditText(this).apply {
-            hint = "粘贴 MP4 或 HLS（m3u8）媒体地址"
+            hint = getString(R.string.media_url_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             isSingleLine = true
             imeOptions = EditorInfo.IME_ACTION_GO
@@ -78,23 +78,23 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
         actions.addView(Button(this).apply {
-            text = "粘贴"
+            text = getString(R.string.paste)
             setOnClickListener { pasteFromClipboard() }
         }, weightedWidth())
         actions.addView(Button(this).apply {
-            text = "开始下载"
+            text = getString(R.string.download)
             setOnClickListener { submitManualInput() }
         }, weightedWidth())
         content.addView(actions, matchWidth().apply { topMargin = 12.dp })
 
         content.addView(TextView(this).apply {
-            text = "也可以在浏览器或其他应用中点“分享”，然后选择 DownKit。\n\n当前移动端直接支持 MP4/HLS 媒体地址；普通网页需要扩展先捕获媒体地址。YouTube 常用分离音视频轨，当前移动端尚未支持。"
+            text = getString(R.string.mobile_instructions)
             textSize = 14f
             setPadding(0, 20.dp, 0, 12.dp)
         }, matchWidth())
         status = TextView(this).apply {
             textSize = 15f
-            text = "已就绪。完成的视频会保存到：下载/DownKit\n\n${mobileToolSummary()}"
+            text = getString(R.string.ready_status, mobileToolSummary())
         }
         content.addView(status, matchWidth())
         return ScrollView(this).apply { addView(content) }
@@ -110,7 +110,7 @@ class MainActivity : Activity() {
         if (uri.scheme != "downkit" || uri.host != "download") return
         val source = normalizeHttpUrl(uri.getQueryParameter("url").orEmpty())
         if (source == null) {
-            rejectInput("deep-link", "拒绝了无效的媒体 URL。")
+            rejectInput("deep-link", getString(R.string.invalid_link))
             return
         }
         dispatchDownload(
@@ -128,12 +128,12 @@ class MainActivity : Activity() {
         val shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
         val source = extractHttpUrl(shared)
         if (source == null) {
-            rejectInput("share", "分享内容中没有有效的 HTTP/HTTPS 地址。")
+            rejectInput("share", getString(R.string.invalid_shared_link))
             return
         }
         urlInput.setText(source)
         urlInput.setSelection(source.length)
-        status.text = "已接收分享链接。请确认它是 MP4/HLS 媒体地址，然后点“开始下载”。"
+        status.text = getString(R.string.shared_link_received)
         MobileLog.info("manual", "activity", "accept-share", "ready", null, "scheme" to source.substringBefore(':'))
     }
 
@@ -143,19 +143,19 @@ class MainActivity : Activity() {
             ?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty()
         val source = extractHttpUrl(text)
         if (source == null) {
-            rejectInput("clipboard", "剪贴板中没有有效的 HTTP/HTTPS 地址。")
+            rejectInput("clipboard", getString(R.string.clipboard_invalid))
             return
         }
         urlInput.setText(source)
         urlInput.setSelection(source.length)
-        status.text = "已粘贴媒体地址，请确认后开始下载。"
+        status.text = getString(R.string.clipboard_ok)
     }
 
     private fun submitManualInput() {
         val source = extractHttpUrl(urlInput.text?.toString().orEmpty())
         if (source == null) {
-            urlInput.error = "请输入有效的 HTTP/HTTPS 媒体地址"
-            rejectInput("manual", "请输入有效的 MP4/HLS 媒体地址。")
+            urlInput.error = getString(R.string.input_invalid)
+            rejectInput("manual", getString(R.string.input_invalid_media))
             return
         }
         urlInput.error = null
@@ -197,7 +197,7 @@ class MainActivity : Activity() {
             "scheme" to source.substringBefore(':'),
         )
         startForegroundService(service)
-        status.text = "任务已交给后台下载服务。完成后会保存到：下载/DownKit"
+        status.text = getString(R.string.download_dispatched)
     }
 
     private fun rejectInput(ingress: String, message: String) {
@@ -242,7 +242,7 @@ class MainActivity : Activity() {
     private fun mobileToolSummary(): String = runCatching {
         val tools = JSONObject(Downkit.mobileToolsJSON()).getJSONArray("tools")
         buildString {
-            appendLine("组件状态")
+            appendLine(getString(R.string.tools_status))
             for (index in 0 until tools.length()) {
                 val tool = tools.getJSONObject(index)
                 val health = tool.getJSONObject("health")
@@ -257,7 +257,7 @@ class MainActivity : Activity() {
         }
     }.getOrElse { error ->
         MobileLog.error("app", "activity", "load-tool-summary", "failed", error)
-        "组件状态暂不可用"
+        getString(R.string.tools_unavailable)
     }
 
     private fun matchWidth() = LinearLayout.LayoutParams(

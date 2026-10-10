@@ -3,9 +3,7 @@
 
   const api = root.DownKitPopup;
   let tools = [];
-  const editingTools = new Set();
-  const expandedTools = new Set();
-  let initializedExpansion = false;
+  const navigation = [];
 
   function setIndicator(state, text) {
     const indicator = document.getElementById("bridgeIndicator");
@@ -42,13 +40,6 @@
     if (!field.readOnly) input.dataset.configKey = field.key;
     return input;
   }
-
-  const groupDefinitions = {
-    runtime: { title: "连接与运行时", description: "浏览器到本机服务的可信连接" },
-    capability: { title: "下载能力", description: "发现、解析和下载媒体" },
-    dependency: { title: "外部组件", description: "按需参与封装和页面解析" },
-    other: { title: "其他 Tool", description: "尚未分类的能力" }
-  };
 
   function normalizedKind(tool) {
     const kind = String(tool && tool.kind || "").toLowerCase();
@@ -286,8 +277,7 @@
       editButton.title = `编辑 ${tool.displayName || tool.name} 配置`;
       editButton.setAttribute("aria-label", editButton.title);
       editButton.addEventListener("click", () => {
-        expandedTools.add(tool.name);
-        editingTools.add(tool.name);
+        navigation.push({ type: "edit", id: tool.name });
         renderTools(tools);
       });
       controls.appendChild(editButton);
@@ -304,7 +294,7 @@
     cancelButton.className = "secondary";
     cancelButton.textContent = "取消";
     cancelButton.addEventListener("click", () => {
-      editingTools.delete(tool.name);
+      navigation.pop();
       renderTools(tools);
     });
     saveButton.addEventListener("click", async () => {
@@ -312,7 +302,7 @@
       cancelButton.disabled = true;
       try {
         await saveToolConfig(tool, card);
-        editingTools.delete(tool.name);
+          navigation.pop();
         api.setMessage("environmentMessage", `${tool.displayName || tool.name} 配置已保存。`, "ok");
         await refresh();
       } catch (error) {
@@ -325,143 +315,221 @@
     container.appendChild(controls);
   }
 
-  function groupContainer(list, containers, tool) {
-    const key = normalizedKind(tool);
-    if (containers.has(key)) return containers.get(key);
-    const definition = groupDefinitions[key];
-    const section = document.createElement("section");
-    section.className = "tool-group";
-    section.dataset.toolGroup = key;
-    const heading = document.createElement("div");
-    heading.className = "tool-group-heading";
-    const title = document.createElement("h3");
-    title.textContent = definition.title;
-    const description = document.createElement("span");
-    description.textContent = definition.description;
-    heading.append(title, description);
-    const cards = document.createElement("div");
-    cards.className = "tool-group-list";
-    section.append(heading, cards);
+  const categoryMeta = {
+    appearance: { title: "界面与交互", description: "语言、导航方式与工作台偏好", icon: "appearance" },
+    runtime: { title: "连接与运行时", description: "浏览器连接、Bridge 与网络", icon: "runtime" },
+    capability: { title: "下载能力", description: "媒体嗅探、下载与处理", icon: "capability" },
+    dependency: { title: "外部组件", description: "FFmpeg、yt-dlp、识别和翻译", icon: "dependency" },
+    other: { title: "其他组件", description: "其他可选模块", icon: "settings" }
+  };
+
+  function symbol(name, className = "ui-icon") {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add(className);
+    svg.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", "#i-" + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function settingsRow({ title, subtitle, icon, trailing, health, action }) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "settings-row";
+    const symbolWrap = document.createElement("span");
+    symbolWrap.className = "settings-row-symbol";
+    symbolWrap.appendChild(symbol(icon || "settings"));
+    const copy = document.createElement("span");
+    copy.className = "settings-row-copy";
+    const name = document.createElement("strong");
+    name.textContent = title;
+    const secondary = document.createElement("small");
+    secondary.textContent = subtitle || "";
+    copy.append(name, secondary);
+    row.append(symbolWrap, copy);
+    if (trailing) {
+      const badge = document.createElement("span");
+      badge.className = "settings-row-trailing" + (health ? " " + cardState(health) : "");
+      badge.textContent = trailing;
+      row.appendChild(badge);
+    }
+    row.appendChild(symbol("chevron", "settings-chevron"));
+    row.addEventListener("click", action);
+    return row;
+  }
+
+  function settingsHeading(title, description) {
+    const back = document.getElementById("settingsBack");
+    back.hidden = navigation.length === 0;
+    document.getElementById("settingsTitle").textContent = title;
+    document.getElementById("settingsSubtitle").textContent = description;
+  }
+
+  function enter(type, id) {
+    navigation.push({ type, id });
+    renderTools(tools);
+  }
+
+  function goBack() {
+    if (!navigation.length) return;
+    navigation.pop();
+    renderTools(tools);
+  }
+
+  function addSection(list, label) {
+    const section = document.createElement("h3");
+    section.className = "settings-section-label";
+    section.textContent = label;
     list.appendChild(section);
-    containers.set(key, cards);
-    return cards;
+  }
+
+  function toolActions(body, tool, health) {
+    const actions = Array.isArray(tool.actions) ? tool.actions : [];
+    if (!actions.length) return;
+    const actionRow = document.createElement("div");
+    actionRow.className = "tool-actions";
+    for (const action of actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = health.ok ? "secondary" : "primary";
+      button.textContent = action.label || action.id;
+      button.title = action.description || "";
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        api.setMessage("environmentMessage", "正在执行 " + (tool.displayName || tool.name) + "：" + (action.label || action.id) + "…");
+        try {
+          await api.send("bridge.tool.action", { tool: tool.name, toolAction: action.id });
+          const success = action.id === "restart" ? "Bridge 已重启并重新连接。"
+            : action.id === "open-output" ? "已打开下载目录。"
+            : (tool.displayName || tool.name) + " 已安装。";
+          api.setMessage("environmentMessage", success, "ok");
+          await refresh();
+        } catch (error) {
+          api.setMessage("environmentMessage", error.message || String(error), "error");
+        } finally {
+          button.disabled = false;
+        }
+      });
+      actionRow.appendChild(button);
+    }
+    body.appendChild(actionRow);
+  }
+
+  function renderDetail(list, tool, editing) {
+    const health = tool.health || {};
+    const card = document.createElement("section");
+    card.className = "settings-detail-card";
+    card.dataset.toolName = tool.name || "";
+    const header = document.createElement("div");
+    header.className = "settings-tool-header";
+    const status = document.createElement("div");
+    status.className = "settings-tool-status";
+    const dot = document.createElement("span");
+    dot.className = "dot " + cardState(health);
+    const summary = document.createElement("span");
+    summary.textContent = health.summary || health.status || "等待检测";
+    status.append(dot, summary);
+    if (health.version) {
+      const version = document.createElement("small");
+      version.textContent = health.version;
+      status.append(version);
+    }
+    header.appendChild(status);
+    if (!editing) renderToolToggle(header, tool, card);
+    const body = document.createElement("div");
+    body.className = "settings-detail-body";
+    if (editing) {
+      const help = document.createElement("p");
+      help.className = "settings-help";
+      help.textContent = "修改后保存到 Data/config.toml，所有入口共用。";
+      body.appendChild(help);
+      renderConfigEditor(body, tool);
+      renderEditControls(body, tool, card, true);
+    } else {
+      if (tool.description) {
+        const description = document.createElement("p");
+        description.className = "settings-help";
+        description.textContent = tool.description;
+        body.appendChild(description);
+      }
+      const detail = [health.detail, health.path].filter(Boolean).join(" · ");
+      if (detail) {
+        const line = document.createElement("p");
+        line.className = "tool-detail";
+        line.textContent = detail;
+        body.appendChild(line);
+      }
+      renderConfigView(body, tool);
+      renderModelManager(body, tool);
+      if (visibleConfigFields(tool, true).length) renderEditControls(body, tool, card, false);
+      toolActions(body, tool, health);
+    }
+    card.append(header, body);
+    list.appendChild(card);
   }
 
   function renderTools(nextTools) {
-    const list = document.getElementById("toolList");
-    if (!initializedExpansion) {
-      for (const tool of Array.isArray(nextTools) ? nextTools : []) {
-        if (tool.config && tool.config.defaultExpanded) expandedTools.add(tool.name);
-      }
-      initializedExpansion = true;
-    }
-    list.replaceChildren();
     tools = Array.isArray(nextTools) ? nextTools : [];
-    const containers = new Map();
-
-    for (const tool of tools) {
-      const health = tool.health || {};
-      const card = document.createElement("details");
-      card.className = `tool-card ${cardState(health)}`;
-      card.dataset.toolName = tool.name || "";
-      const editing = editingTools.has(tool.name);
-      card.open = editing || expandedTools.has(tool.name);
-      card.addEventListener("toggle", () => {
-        if (card.open) expandedTools.add(tool.name);
-        else expandedTools.delete(tool.name);
-      });
-
-      const summary = document.createElement("summary");
-      const dot = document.createElement("span");
-      dot.className = "dot";
-      const main = document.createElement("span");
-      main.className = "tool-card-main";
-      const title = document.createElement("span");
-      title.className = "tool-card-title";
-      const strong = document.createElement("strong");
-      strong.textContent = tool.displayName || tool.name;
-      const kind = document.createElement("span");
-      kind.className = "tool-kind";
-      kind.textContent = normalizedKind(tool);
-      title.append(strong, kind);
-      const headline = document.createElement("span");
-      headline.className = "tool-summary";
-      headline.textContent = health.summary || "等待检测";
-      main.append(title, headline);
-      const status = document.createElement("span");
-      status.className = "tool-health";
-      status.textContent = health.version || health.status || "unknown";
-      summary.append(dot, main, status);
-      renderToolToggle(summary, tool, card);
-      const editableSchema = visibleConfigFields(tool, true);
-
-      const body = document.createElement("div");
-      body.className = "tool-card-body";
-      if (tool.description || editableSchema.length) {
-        const bodyHeader = document.createElement("div");
-        bodyHeader.className = "tool-card-body-header";
-        if (tool.description) {
-          const description = document.createElement("p");
-          description.className = "tool-description";
-          description.textContent = tool.description;
-          bodyHeader.appendChild(description);
-        }
-        if (editableSchema.length) renderEditControls(bodyHeader, tool, card, editing);
-        body.appendChild(bodyHeader);
+    const list = document.getElementById("toolList");
+    const preferences = document.getElementById("settingsInterface");
+    if (!list || !preferences) return;
+    list.replaceChildren();
+    list.hidden = false;
+    preferences.hidden = true;
+    const frame = navigation[navigation.length - 1];
+    if (!frame) {
+      settingsHeading("设置", "下载、连接、组件与界面偏好");
+      addSection(list, "偏好设置");
+      list.appendChild(settingsRow({
+        title: categoryMeta.appearance.title, subtitle: categoryMeta.appearance.description,
+        icon: "appearance", action: () => enter("category", "appearance")
+      }));
+      addSection(list, "系统与组件");
+      for (const kind of ["runtime", "capability", "dependency", "other"]) {
+        const count = tools.filter(tool => normalizedKind(tool) === kind).length;
+        if (!count) continue;
+        list.appendChild(settingsRow({
+          title: categoryMeta[kind].title, subtitle: categoryMeta[kind].description,
+          icon: categoryMeta[kind].icon, trailing: String(count) + " 项",
+          action: () => enter("category", kind)
+        }));
       }
-      const detailText = [health.detail, health.path].filter(Boolean).join(" · ");
-      if (detailText) {
-        const detail = document.createElement("p");
-        detail.className = "tool-detail";
-        detail.textContent = detailText;
-        body.appendChild(detail);
-      }
-
-      renderModelManager(body, tool);
-      if (editing) renderConfigEditor(body, tool);
-      else renderConfigView(body, tool);
-      const actions = Array.isArray(tool.actions) ? tool.actions : [];
-      if (actions.length && !editing) {
-        const actionRow = document.createElement("div");
-        actionRow.className = "tool-actions";
-        for (const action of actions) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = health.ok ? "secondary" : "primary";
-          button.textContent = action.label || action.id;
-          button.title = action.description || "";
-          button.addEventListener("click", async () => {
-            button.disabled = true;
-            api.setMessage("environmentMessage", `正在执行 ${tool.displayName || tool.name}：${action.label || action.id}…`);
-            try {
-              await api.send("bridge.tool.action", { tool: tool.name, toolAction: action.id });
-              const success = action.id === "restart"
-                ? "Bridge 已重启并重新连接。"
-                : action.id === "open-output"
-                  ? "已打开下载目录。"
-                : `${tool.displayName || tool.name} 已安装。`;
-              api.setMessage("environmentMessage", success, "ok");
-              await refresh();
-            } catch (error) {
-              api.setMessage("environmentMessage", error.message || String(error), "error");
-            } finally {
-              button.disabled = false;
-            }
-          });
-          actionRow.appendChild(button);
-        }
-        body.appendChild(actionRow);
-      }
-      card.append(summary, body);
-      groupContainer(list, containers, tool).appendChild(card);
+      return;
     }
 
-    if (!tools.length) {
-      const empty = document.createElement("p");
-      empty.className = "empty";
-      empty.textContent = "没有可用的 Tool 描述。";
-      list.appendChild(empty);
+    if (frame.type === "category") {
+      const group = categoryMeta[frame.id] || categoryMeta.other;
+      settingsHeading(group.title, group.description);
+      if (frame.id === "appearance") {
+        list.hidden = true;
+        preferences.hidden = false;
+        return;
+      }
+      const groupTools = tools.filter(tool => normalizedKind(tool) === frame.id);
+      for (const tool of groupTools) {
+        const health = tool.health || {};
+        list.appendChild(settingsRow({
+          title: tool.displayName || tool.name, subtitle: health.summary || tool.description,
+          icon: group.icon,
+          trailing: health.status === "ready" ? "就绪" : (health.version || health.status || "未知"),
+          health, action: () => enter("tool", tool.name)
+        }));
+      }
+      if (!groupTools.length) addSection(list, "暂无可用组件");
+      return;
     }
+
+    const tool = tools.find(item => item.name === frame.id);
+    if (!tool) {
+      navigation.pop();
+      renderTools(tools);
+      return;
+    }
+    const editing = frame.type === "edit";
+    settingsHeading(editing ? "编辑 " + (tool.displayName || tool.name) : (tool.displayName || tool.name),
+      editing ? "保存后更新 TOML 配置" : (tool.description || "查看组件状态与设置"));
+    renderDetail(list, tool, editing);
   }
 
   async function refresh() {
@@ -481,6 +549,7 @@
 
   function init() {
     document.getElementById("refreshEnvironment").addEventListener("click", refresh);
+    document.getElementById("settingsBack").addEventListener("click", goBack);
   }
 
   root.DownKitEnvironment = { init, activate: refresh, renderTools };
