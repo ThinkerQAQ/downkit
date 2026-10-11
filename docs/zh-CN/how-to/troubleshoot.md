@@ -11,10 +11,6 @@
 3. 在 \`chrome://extensions\` 或 \`edge://extensions\` 查看 DownKit 的扩展 ID。如果不等于 \`hfjpenjlamneepmigemmmiibebpokmik\`，重新执行安装命令并加上 \`--extension-id 实际的32位ID\`。
 4. 在浏览器的扩展页点击「重新加载」。如果后来移动过程序目录，必须在新目录重新安装。
 
-![实际的 Native Messaging 找不到报错界面](../../images/bridge-not-found-en.png)
-
-*这是隔离 Chromium 下真实的 v1.2.0 **连接失败** 截图，绝非正常连接或下载成功截图。*
-
 ## 环境状态一直显示 Checking environment
 
 先通过浏览器工具栏的扩展图标启动，而不是直接输入 Web UI 地址。扩展会按需拉起 Bridge。在「设置 → 连接与运行环境」刷新健康状态。

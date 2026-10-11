@@ -11,10 +11,6 @@ The browser extension connects through the registered native host \`com.downkit.
 3. In \`chrome://extensions\` or \`edge://extensions\`, inspect DownKit's extension ID. If it differs from \`hfjpenjlamneepmigemmmiibebpokmik\`, re-run \`downkitdev install --extension-id ACTUAL_EXTENSION_ID\`.
 4. Click **Reload** on the unpacked extension, then open it again. If the package was moved, re-run install from its **new** root.
 
-![A genuine browser state when the Native Messaging host cannot be found](../images/bridge-not-found-en.png)
-
-*Actual DownKit v1.2.0 isolated Chromium screenshot showing the **failure** state; it is intentionally not labelled as a successful setup.*
-
 ## Bridge indicator remains Checking environment
 
 Start by clicking the extension icon rather than opening the Web UI URL directly. The extension starts the Bridge on demand. Open **Settings → Connection & runtime** and refresh the health display.
