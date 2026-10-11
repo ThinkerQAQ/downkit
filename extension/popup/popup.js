@@ -14,6 +14,8 @@ function activateTab(name) {
   });
   DownKitDownloads.deactivate();
   DownKitJobs.deactivate();
+  DownKitLogs.deactivate();
+  if (name === "logs") return DownKitLogs.activate();
 	if (name === "environment") return DownKitEnvironment.activate();
 	if (name === "sniffer") return DownKitDownloads.activate();
 	if (name === "jobs") return DownKitJobs.activate();
@@ -50,9 +52,45 @@ async function initOpenMode() {
   });
 }
 
+function setLogsVisible(visible) {
+  const tab = document.getElementById("logsTab");
+  tab.hidden = !visible;
+  document.getElementById("showLogsTab").checked = visible;
+  if (!visible && document.querySelector(".tab.active") === tab) activateTab("environment");
+}
+
+async function refreshLogsVisibility() {
+  try {
+    const result = await DownKitPopup.send("ui.logs.get");
+    setLogsVisible(result.showLogs !== false);
+  } catch (error) {
+    DownKitPopup.setMessage("environmentMessage", error.message || String(error), "error");
+  }
+}
+
+function initLogsVisibility() {
+  const control = document.getElementById("showLogsTab");
+  control.addEventListener("change", async () => {
+    const wanted = control.checked;
+    control.disabled = true;
+    try {
+      const result = await DownKitPopup.send("ui.logs.set", { showLogs: wanted });
+      setLogsVisible(result.showLogs !== false);
+      DownKitPopup.setMessage("environmentMessage", "日志入口设置已保存。", "ok");
+    } catch (error) {
+      control.checked = !wanted;
+      DownKitPopup.setMessage("environmentMessage", error.message || String(error), "error");
+    } finally {
+      control.disabled = false;
+    }
+  });
+  refreshLogsVisibility();
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshLogsVisibility();
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("extensionVersion").textContent =
-    DownKitPopup.host === "web" ? "Web UI" : `v${chrome.runtime.getManifest().version}`;
   const open = document.getElementById("openWorkspace");
   if (DownKitPopup.host === "web") open.hidden = true;
   open.addEventListener("click", async () => {
@@ -68,19 +106,23 @@ document.addEventListener("DOMContentLoaded", () => {
   DownKitI18n.init();
   DownKitEnvironment.init();
   DownKitJobs.init();
+  DownKitLogs.init();
+  initLogsVisibility();
   DownKitDownloads.init();
   initOpenMode();
   const tabs = [...document.querySelectorAll("[data-tab]")];
-  for (const [index, tab] of tabs.entries()) {
+  for (const tab of tabs) {
     tab.addEventListener("click", () => activateTab(tab.dataset.tab));
     tab.addEventListener("keydown", event => {
       if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
+      const visible = tabs.filter(candidate => !candidate.hidden);
+      const index = visible.indexOf(tab);
       const next = event.key === "Home" ? 0 :
-        event.key === "End" ? tabs.length - 1 :
-          (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
-      tabs[next].focus();
-      activateTab(tabs[next].dataset.tab);
+        event.key === "End" ? visible.length - 1 :
+          (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + visible.length) % visible.length;
+      visible[next].focus();
+      activateTab(visible[next].dataset.tab);
     });
   }
   if (DownKitPopup.host === "web") activateTab("jobs");
@@ -90,4 +132,5 @@ document.addEventListener("DOMContentLoaded", () => {
 window.addEventListener("unload", () => {
   DownKitDownloads.deactivate();
   DownKitJobs.deactivate();
+  DownKitLogs.deactivate();
 });

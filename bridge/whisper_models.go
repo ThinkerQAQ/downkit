@@ -305,8 +305,10 @@ func (s *bridgeServer) handleInstallWhisperModel(response http.ResponseWriter, r
 	s.mu.Lock()
 	config := s.config
 	s.mu.Unlock()
+	appendRuntimeEvent("INFO", "bridge", "component_install_started", "operation", "whisper")
 	path, err := installWhisperModelComponent(request.Context(), config.Proxy, input.Model, config)
 	if err != nil {
+		appendRuntimeEvent("ERROR", "bridge", "component_install_failed", "operation", "whisper")
 		writeJSON(response, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -323,5 +325,6 @@ func (s *bridgeServer) handleInstallWhisperModel(response http.ResponseWriter, r
 	s.mu.Lock()
 	s.config = normalized
 	s.mu.Unlock()
+	appendRuntimeEvent("INFO", "bridge", "component_install_completed", "operation", "whisper")
 	writeJSON(response, http.StatusOK, map[string]any{"ok": true, "model": input.Model, "path": path})
 }

@@ -195,8 +195,10 @@ func (s *bridgeServer) handleInstallTranslationModel(response http.ResponseWrite
 	s.mu.Lock()
 	config := s.config
 	s.mu.Unlock()
+	appendRuntimeEvent("INFO", "bridge", "component_install_started", "operation", "llama")
 	path, err := installTranslationModelComponent(request.Context(), config.Proxy, input.Model, input.AcceptLicense, config)
 	if err != nil {
+		appendRuntimeEvent("ERROR", "bridge", "component_install_failed", "operation", "llama")
 		writeJSON(response, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -213,5 +215,6 @@ func (s *bridgeServer) handleInstallTranslationModel(response http.ResponseWrite
 	s.mu.Lock()
 	s.config = normalized
 	s.mu.Unlock()
+	appendRuntimeEvent("INFO", "bridge", "component_install_completed", "operation", "llama")
 	writeJSON(response, http.StatusOK, map[string]any{"ok": true, "model": input.Model, "path": path})
 }

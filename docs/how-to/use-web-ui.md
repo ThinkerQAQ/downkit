@@ -9,3 +9,14 @@ The workspace shares extension features but depends on the installed extension f
 The Settings page uses Android-style drill-down navigation: **Settings → Category → Tool details → Edit**. Language and extension open mode are under **Settings → Appearance & interaction**. The Web UI uses an icon sidebar; extension surfaces use compact icon navigation.
 
 Popup and Side Panel use an icon rail, while Web UI uses a labelled sidebar. The detection page groups page context, download options and detected resources into one consistent card.
+
+## View runtime logs
+
+Open the **Logs** item in the sidebar to inspect Bridge and Worker events. Search, filter by severity, auto-refresh, select, copy or clear the visible logs. The navigation item can be hidden in **Settings → Appearance & interaction → Show logs tab**; the files remain under `Data/logs/`.
+
+
+## Application version
+
+Open **Settings → About** to view the browser extension version and the
+running Bridge version. Both values are shown there for Popup, Side Panel and
+Web UI, rather than in the global header.

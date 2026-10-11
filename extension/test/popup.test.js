@@ -9,7 +9,7 @@ const popupSource = fs.readFileSync(path.join(__dirname, "../popup/popup.js"), "
 const tabs = [...html.matchAll(/data-tab="([^"]+)"/g)].map(match => match[1]);
 const panels = [...html.matchAll(/data-panel="([^"]+)"/g)].map(match => match[1]);
 
-assert.deepEqual(tabs, ["sniffer", "jobs", "environment"]);
+assert.deepEqual(tabs, ["sniffer", "jobs", "logs", "environment"]);
 assert.deepEqual(panels, tabs);
 assert.match(popupSource, /activateTab\("sniffer"\);/);
 assert.match(html, />资源嗅探<\/span><\/button>/);
@@ -49,6 +49,24 @@ assert.match(environmentSource, /function goBack/);
 assert.match(html, /id="settingsInterface"/);
 assert.match(html, /id="uiLanguage"/);
 assert.match(html, /id="settingsBack"/);
+assert.doesNotMatch(html, /id="extensionVersion"/);
+assert.doesNotMatch(popupSource, /getManifest\(\)\.version/);
+assert.match(html, /id="settingsAbout"/);
+assert.match(html, /id="aboutAppVersion"/);
+assert.match(html, /id="aboutBridgeVersion"/);
+assert.match(environmentSource, /enter\("about", "downkit"\)/);
+assert.match(environmentSource, /frame\.type === "about"/);
+assert.match(environmentSource, /api\.send\("ui\.about"\)/);
+
+assert.match(html, /id="logsTab"/);
+assert.match(html, /id="logsPanel"/);
+assert.match(html, /id="logOutput"/);
+assert.match(html, /id="logAutoRefresh"/);
+assert.match(html, /id="showLogsTab"/);
+assert.match(html, /<script src="logs.js"><\/script>/);
+assert.match(popupSource, /setLogsVisible/);
+assert.match(popupSource, /ui\.logs\.set/);
+assert.match(popupStyles, /\.log-viewer/);
 assert.match(html, /href="#i-settings"/);
 assert.doesNotMatch(environmentSource, /function editIcon/);
 assert.match(environmentSource, /className = "settings-detail-card"/);

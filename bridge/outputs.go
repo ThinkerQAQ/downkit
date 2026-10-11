@@ -40,16 +40,21 @@ func (a *app) finalizeOutputs(outputs []MediaOutput) error {
 		return err
 	}
 
+	appendRuntimeEvent("INFO", "worker", "media_outputs_verified", "jobId", a.opts.jobID, "fileCount", fmt.Sprint(len(outputs)))
 	artifacts := subtitleArtifactsFromMedia(outputs)
 	if a.opts.subtitleRequest.enabled() {
+		appendRuntimeEvent("INFO", "worker", "subtitle_processing_started", "jobId", a.opts.jobID)
 		if a.subtitlePipeline == nil {
+			appendRuntimeEvent("ERROR", "worker", "subtitle_processing_failed", "jobId", a.opts.jobID, "reason", "missing_pipeline")
 			return errors.New("字幕流水线尚未配置")
 		}
 		publishJobPhaseProgress("processing", 0, "正在准备字幕处理", 0, 0, 0)
 		generated, pipelineErr := a.subtitlePipeline.Process(context.Background(), a.opts.subtitleRequest, outputs)
 		if pipelineErr != nil {
+			appendRuntimeEvent("ERROR", "worker", "subtitle_processing_failed", "jobId", a.opts.jobID, "reason", "pipeline_error")
 			return fmt.Errorf("字幕处理失败：%w", pipelineErr)
 		}
+		appendRuntimeEvent("INFO", "worker", "subtitle_processing_completed", "jobId", a.opts.jobID, "subtitleCount", fmt.Sprint(len(generated)))
 		artifacts = appendUniqueSubtitleArtifacts(artifacts, generated...)
 	}
 

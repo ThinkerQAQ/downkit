@@ -229,6 +229,47 @@
     "Native Messaging 已连接": "Native Messaging connected"
   });
 
+  Object.assign(dictionary, {
+  "日志": "Logs",
+  "运行日志": "Runtime logs",
+  "查看 DownKit Bridge 与下载 Worker 的本地运行记录。": "View local Bridge and worker events.",
+  "显示日志入口": "Show logs tab",
+  "仅隐藏导航入口，不影响日志写入": "Hides navigation only; logging continues",
+  "日志入口设置已保存。": "Log tab preference saved.",
+  "读取中": "Loading",
+  "搜索": "Search",
+  "显示级别": "Log level",
+  "全部": "All",
+  "自动刷新": "Auto-refresh",
+  "全选": "Select all",
+  "暂无日志": "No logs",
+  "事件 / component / error": "Event / component / error",
+  "日志已刷新。": "Logs refreshed.",
+  "读取失败": "Read failed",
+  "已选中当前可见日志；自动刷新已暂停。": "Visible logs selected; auto-refresh paused.",
+  "没有可复制的日志。": "No logs to copy.",
+  "已复制选中的日志。": "Selected logs copied.",
+  "已复制当前可见日志。": "Visible logs copied.",
+  "正在清空日志…": "Clearing logs…",
+  "日志已清空。": "Logs cleared.",
+  "设置": "Settings",
+  "日志目录": "Log directory"
+});
+
+  Object.assign(dictionary, {
+    "关于": "About",
+    "其他": "Other",
+    "版本与应用信息": "Versions and application information",
+    "DownKit 版本与应用信息": "DownKit version and application information",
+    "应用版本": "App version",
+    "浏览器扩展版本": "Browser extension version",
+    "本地服务版本": "Local service version",
+    "DownKit Bridge 运行版本": "DownKit Bridge runtime version",
+    "读取中…": "Loading…",
+    "未连接": "Not connected",
+    "未知": "Unknown"
+  });
+
   let locale = "zh-CN";
   const source = new WeakMap();
   const lastDisplay = new WeakMap();

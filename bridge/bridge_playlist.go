@@ -1,6 +1,7 @@
 package downkit
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -31,11 +32,14 @@ func (s *bridgeServer) handlePlaylistProbe(response http.ResponseWriter, request
 	config := s.config
 	s.mu.Unlock()
 
+	appendRuntimeEvent("INFO", "bridge", "playlist_probe_started")
 	result, err := probeBridgePlaylist(task, config)
 	if err != nil {
+		appendRuntimeEvent("ERROR", "bridge", "playlist_probe_failed", "reason", "resolve")
 		writeJSON(response, http.StatusUnprocessableEntity, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	appendRuntimeEvent("INFO", "bridge", "playlist_probe_completed", "count", fmt.Sprint(result.Count))
 	writeJSON(response, http.StatusOK, map[string]any{
 		"ok":       true,
 		"playlist": result.Playlist,

@@ -15,3 +15,15 @@ The Bridge validates writes and saves changes atomically. The browser extension 
 
 
 Edits made directly to TOML require restarting the Bridge; changes saved through the UI apply immediately.
+
+
+## Logs tab and log files
+
+Use **Settings → Appearance & interaction → Show logs tab** to toggle the Logs navigation item in Popup, Side Panel and Web UI. It maps to `[interface] show_logs` in TOML (defaults to `true`) and does not turn logging off.
+
+The Logs page reads only known runtime log files under `Data/logs/` through an authenticated Bridge API. It provides search, severity filters, auto-refresh, select-all, copy, and clear, following BlogCTL. File logging is controlled separately by `[logging] enabled` and `max_size_mb`.
+
+
+### Runtime event coverage and privacy
+
+From v1.2.1, logs include job submission, worker startup, download/transcoding/subtitle phase changes, progress at 25% milestones, completion/failure, pause/resume/retry/delete, playlist probes, configuration updates, and external component installation. Events carry severity, component, a 12-character job ID, phase, and safe counts or elapsed time. **URLs, cookies, tokens, media titles, output paths, subtitle text, and raw error messages are not logged.** High-frequency progress polling is not persisted.

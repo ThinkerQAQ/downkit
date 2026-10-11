@@ -396,6 +396,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
 
+  if (message.action === "ui.about") {
+    const extensionVersion = chrome.runtime.getManifest().version;
+    bridgeFetch("/v1/environment")
+      .then(result => sendResponse({
+        ok: true,
+        extensionVersion,
+        bridgeVersion: result.environment?.version || null
+      }), () => sendResponse({ ok: true, extensionVersion, bridgeVersion: null }));
+    return true;
+  }
+
   if (message.action === "ui.language.get") {
     bridgeFetch("/v1/preferences")
       .then(result => sendResponse({ ok: true, locale: result.preferences.uiLanguage }),
@@ -439,6 +450,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentOpenMode = mode;
         sendResponse({ ok: true, mode, supportsSidePanel: Boolean(chrome.sidePanel) });
       }, error => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
+  if (message.action === "ui.logs.get") {
+    bridgeFetch("/v1/preferences")
+      .then(result => sendResponse({ ok: true, showLogs: result.preferences.showLogs !== false }),
+        error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "ui.logs.set") {
+    bridgeFetch("/v1/preferences", { method: "PUT", body: JSON.stringify({ showLogs: Boolean(message.showLogs) }) })
+      .then(result => sendResponse({ ok: true, showLogs: result.preferences.showLogs }),
+        error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "bridge.logs.list") {
+    const limit = Math.max(1, Math.min(Number(message.limit) || 1000, 1000));
+    bridgeFetch("/v1/logs?limit=" + limit)
+      .then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "bridge.logs.clear") {
+    bridgeFetch("/v1/logs", { method: "DELETE" })
+      .then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
     return true;
   }
 

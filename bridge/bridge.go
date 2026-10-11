@@ -166,6 +166,7 @@ func runBridge() error {
 	mux.HandleFunc("/v1/environment", server.handleEnvironment)
 	mux.HandleFunc("/v1/config", server.handleConfig)
 	mux.HandleFunc("/v1/preferences", server.handlePreferences)
+	mux.HandleFunc("/v1/logs", server.handleLogs)
 	mux.HandleFunc("/v1/tools", server.handleTools)
 	mux.HandleFunc("/v1/tools/yt-dlp/install", server.handleInstallYTDLP)
 	mux.HandleFunc("/v1/tools/whisper/models/install", server.handleInstallWhisperModel)
@@ -225,7 +226,7 @@ func (s *bridgeServer) allowExtension(response http.ResponseWriter, request *htt
 		response.Header().Set("Vary", "Origin")
 	}
 	response.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-DownKit-Token")
-	response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+	response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 }
 
 func writeJSON(response http.ResponseWriter, status int, value any) {
@@ -276,6 +277,7 @@ func (s *bridgeServer) handleTasks(response http.ResponseWriter, request *http.R
 	config := s.config
 	s.mu.Unlock()
 	if _, err := optionsFromBridgeTask(task, config); err != nil {
+		appendRuntimeEvent("WARN", "bridge", "task_rejected", "reason", "invalid_options")
 		writeJSON(response, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -406,7 +408,7 @@ func sanitizeBrowserCookies(values []browserCookie) []browserCookie {
 }
 
 func runWorker(workerToken string) error {
-	appendRuntimeLog("worker", "start")
+	started := time.Now()
 	if len(workerToken) != 64 {
 		return errors.New("invalid worker token")
 	}
@@ -423,10 +425,11 @@ func runWorker(workerToken string) error {
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxBridgeBody)).Decode(&payload); err != nil {
 		return err
 	}
+	appendRuntimeEvent("INFO", "worker", "started", "jobId", payload.JobID)
 	reportJobState(payload.JobID, "running", "")
 	opts, err := optionsFromBridgeTask(payload.Task, payload.Config)
 	if err != nil {
-		appendRuntimeLog("worker", "failed")
+		appendRuntimeEvent("ERROR", "worker", "failed", "jobId", payload.JobID, "reason", "invalid_options")
 		reportJobState(payload.JobID, "failed", err.Error())
 		return err
 	}
@@ -437,11 +440,11 @@ func runWorker(workerToken string) error {
 	beginJobReporting(payload.JobID)
 	err = runWithOptions(opts, nil)
 	if err != nil {
-		appendRuntimeLog("worker", "failed")
+		appendRuntimeEvent("ERROR", "worker", "failed", "jobId", payload.JobID, "reason", "download_or_processing")
 		reportJobState(payload.JobID, "failed", err.Error())
 		return err
 	}
-	appendRuntimeLog("worker", "completed")
+	appendRuntimeEvent("INFO", "worker", "completed", "jobId", payload.JobID, "durationMs", fmt.Sprint(time.Since(started).Milliseconds()))
 	reportJobState(payload.JobID, "completed", "")
 	return nil
 }
@@ -518,11 +521,14 @@ func (s *bridgeServer) handleInstallYTDLP(response http.ResponseWriter, request 
 	s.mu.Lock()
 	config := s.config
 	s.mu.Unlock()
+	appendRuntimeEvent("INFO", "bridge", "component_install_started", "operation", "yt-dlp")
 	path, err := installYTDLPComponent(request.Context(), config.Proxy)
 	if err != nil {
+		appendRuntimeEvent("ERROR", "bridge", "component_install_failed", "operation", "yt-dlp")
 		writeJSON(response, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	appendRuntimeEvent("INFO", "bridge", "component_install_completed", "operation", "yt-dlp")
 	writeJSON(response, http.StatusOK, map[string]any{"ok": true, "path": path})
 }
 
@@ -545,6 +551,7 @@ func (s *bridgeServer) handleRestart(response http.ResponseWriter, request *http
 	}
 	s.mu.Unlock()
 	if unfinished > 0 {
+		appendRuntimeEvent("WARN", "bridge", "restart_rejected", "reason", "active_jobs", "count", fmt.Sprint(unfinished))
 		writeJSON(response, http.StatusConflict, map[string]any{
 			"ok": false, "error": fmt.Sprintf("仍有 %d 个正在执行的下载任务，请先暂停后再重启", unfinished),
 		})
@@ -554,6 +561,7 @@ func (s *bridgeServer) handleRestart(response http.ResponseWriter, request *http
 		writeJSON(response, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "当前 Bridge 不支持重启"})
 		return
 	}
+	appendRuntimeEvent("INFO", "bridge", "restart_requested")
 	writeJSON(response, http.StatusAccepted, map[string]any{"ok": true, "restarting": true})
 	go func() {
 		time.Sleep(150 * time.Millisecond)
@@ -589,6 +597,7 @@ func (s *bridgeServer) handleConfig(response http.ResponseWriter, request *http.
 		s.mu.Lock()
 		config.OpenMode = s.config.OpenMode
 		config.UILanguage = s.config.UILanguage
+		config.ShowLogs = s.config.ShowLogs
 		config.DetectHls = s.config.DetectHls
 		config.DetectDash = s.config.DetectDash
 		config.DetectMp4 = s.config.DetectMp4
@@ -601,12 +610,14 @@ func (s *bridgeServer) handleConfig(response http.ResponseWriter, request *http.
 			return
 		}
 		if err := saveBridgeConfig(normalized); err != nil {
+			appendRuntimeEvent("ERROR", "bridge", "config_save_failed", "reason", "io")
 			writeJSON(response, http.StatusInternalServerError, map[string]any{"ok": false, "error": "无法保存配置"})
 			return
 		}
 		s.mu.Lock()
 		s.config = normalized
 		s.mu.Unlock()
+		appendRuntimeEvent("INFO", "bridge", "config_saved")
 		writeJSON(response, http.StatusOK, map[string]any{"ok": true, "config": normalized})
 		return
 	}

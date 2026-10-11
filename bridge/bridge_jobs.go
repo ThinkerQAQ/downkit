@@ -81,6 +81,7 @@ func (s *bridgeServer) enqueueTask(task bridgeTask) (string, error) {
 	}
 	_ = s.persistJobsLocked()
 	s.mu.Unlock()
+	appendRuntimeEvent("INFO", "bridge", "job_queued", "jobId", jobID)
 	if err := s.startJob(jobID); err != nil {
 		s.mu.Lock()
 		delete(s.jobs, jobID)
@@ -142,8 +143,10 @@ func (s *bridgeServer) startJob(jobID string) error {
 			_ = s.persistJobsLocked()
 		}
 		s.mu.Unlock()
+		appendRuntimeEvent("ERROR", "bridge", "worker_launch_failed", "jobId", jobID, "reason", "process_start")
 		return err
 	}
+	appendRuntimeEvent("INFO", "bridge", "worker_spawned", "jobId", jobID, "mode", map[bool]string{true: "resume", false: "start"}[resuming])
 	s.mu.Lock()
 	if current := s.jobs[jobID]; current != nil && current.runID == runID {
 		current.worker = command
@@ -206,6 +209,7 @@ func (s *bridgeServer) waitForWorker(jobID string, runID uint64, command *exec.C
 		job.SpeedBytesPerSecond = 0
 		job.UpdatedAt = time.Now()
 		_ = s.persistJobsLocked()
+		appendRuntimeEvent("ERROR", "bridge", "worker_exited", "jobId", jobID, "reason", "unexpected_exit")
 	}
 }
 
@@ -238,6 +242,7 @@ func (s *bridgeServer) setJobStatus(jobID, status, message string) error {
 	default:
 		return errors.New("invalid task status")
 	}
+	previousStatus := job.Status
 	job.Status = status
 	job.Error = strings.TrimSpace(message)
 	if status == "running" && job.Detail == "等待启动" {
@@ -254,6 +259,13 @@ func (s *bridgeServer) setJobStatus(jobID, status, message string) error {
 	job.SpeedBytesPerSecond = 0
 	job.UpdatedAt = time.Now()
 	_ = s.persistJobsLocked()
+	if previousStatus != status {
+		level := "INFO"
+		if status == "failed" {
+			level = "ERROR"
+		}
+		appendRuntimeEvent(level, "bridge", "job_"+status, "jobId", jobID)
+	}
 	return nil
 }
 
@@ -267,6 +279,7 @@ func (s *bridgeServer) setJobProgress(jobID, phase string, progress int, detail 
 	if job.Status != "running" && job.Status != "queued" {
 		return nil
 	}
+	previousPhase, previousProgress := job.Phase, job.Progress
 	phase = strings.TrimSpace(phase)
 	if phase != "" {
 		switch phase {
@@ -286,6 +299,13 @@ func (s *bridgeServer) setJobProgress(jobID, phase string, progress int, detail 
 	job.SpeedBytesPerSecond = max(speedBytesPerSecond, 0)
 	job.UpdatedAt = time.Now()
 	_ = s.persistJobsLocked()
+	// Only phase boundaries and 25% milestones are logged; every worker
+	// heartbeat continues to update the task UI without flooding Data/logs.
+	if job.Phase != previousPhase {
+		appendRuntimeEvent("INFO", "bridge", "phase_changed", "jobId", jobID, "phase", job.Phase)
+	} else if job.Progress/25 > previousProgress/25 {
+		appendRuntimeEvent("INFO", "bridge", "progress", "jobId", jobID, "phase", job.Phase, "progress", fmt.Sprint((job.Progress/25)*25))
+	}
 	return nil
 }
 
@@ -358,6 +378,7 @@ func (s *bridgeServer) setJobFiles(jobID string, files []bridgeJobFile) error {
 		return errors.New("playlist has no valid files")
 	}
 	job.Files = merged
+	appendRuntimeEvent("INFO", "bridge", "playlist_detected", "jobId", jobID, "fileCount", fmt.Sprint(len(merged)))
 	job.UpdatedAt = time.Now()
 	_ = s.persistJobsLocked()
 	return nil
@@ -457,6 +478,7 @@ func (s *bridgeServer) pauseJob(jobID string) error {
 	job.workerToken = ""
 	job.worker = nil
 	job.Status = "paused"
+	appendRuntimeEvent("INFO", "bridge", "job_paused", "jobId", jobID)
 	job.Detail = "已暂停，可从检查点继续"
 	job.SpeedBytesPerSecond = 0
 	job.UpdatedAt = time.Now()
@@ -537,6 +559,7 @@ func (s *bridgeServer) deleteJob(jobID string, deleteFiles bool) error {
 				_ = s.persistJobsLocked()
 			}
 			s.mu.Unlock()
+			appendRuntimeEvent("ERROR", "bridge", "job_delete_failed", "jobId", jobID, "reason", "filesystem")
 			return errors.New(message)
 		}
 	}
@@ -544,6 +567,11 @@ func (s *bridgeServer) deleteJob(jobID string, deleteFiles bool) error {
 	delete(s.jobs, jobID)
 	_ = s.persistJobsLocked()
 	s.mu.Unlock()
+	mode := "record"
+	if deleteFiles {
+		mode = "files"
+	}
+	appendRuntimeEvent("INFO", "bridge", "job_deleted", "jobId", jobID, "mode", mode)
 	return nil
 }
 
@@ -564,13 +592,16 @@ func (s *bridgeServer) handleJobs(response http.ResponseWriter, request *http.Re
 	}
 	if path == "clear" && request.Method == http.MethodPost {
 		s.mu.Lock()
+		cleared := 0
 		for id, job := range s.jobs {
 			if job.Status == "completed" || job.Status == "failed" {
 				delete(s.jobs, id)
+				cleared++
 			}
 		}
 		_ = s.persistJobsLocked()
 		s.mu.Unlock()
+		appendRuntimeEvent("INFO", "bridge", "jobs_cleared", "count", fmt.Sprint(cleared))
 		writeJSON(response, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
@@ -674,6 +705,7 @@ func (s *bridgeServer) handleJobs(response http.ResponseWriter, request *http.Re
 			writeJSON(response, http.StatusInternalServerError, map[string]any{"ok": false, "error": "cannot retry task"})
 			return
 		}
+		appendRuntimeEvent("INFO", "bridge", "job_retried", "jobId", jobID)
 		writeJSON(response, http.StatusAccepted, map[string]any{"ok": true, "taskId": jobID})
 		return
 	}
@@ -711,6 +743,7 @@ func (s *bridgeServer) handleJobs(response http.ResponseWriter, request *http.Re
 			writeJSON(response, http.StatusInternalServerError, map[string]any{"ok": false, "error": "cannot resume task"})
 			return
 		}
+		appendRuntimeEvent("INFO", "bridge", "job_resumed", "jobId", jobID)
 		writeJSON(response, http.StatusAccepted, map[string]any{"ok": true, "taskId": jobID})
 		return
 	}
