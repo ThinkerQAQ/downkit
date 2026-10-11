@@ -2,5 +2,6 @@
 
 - [Configure tools](configure-tools.md)
 - [Use the Web UI](use-web-ui.md)
+- [Troubleshoot the connection and first download](troubleshoot.md)
 
-For a first download, use the [tutorial](../tutorial/first-download.md).
+For a new installation, start with the [first-run guide and screenshots](../tutorial/first-run-on-new-machine.md); then follow the [first download](../tutorial/first-download.md).

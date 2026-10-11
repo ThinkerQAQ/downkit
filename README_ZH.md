@@ -13,26 +13,15 @@ Windows 版支持在下载媒体的同时生成独立字幕文件：
 - 可使用随发行包提供的 llama.cpp 和 TranslateGemma 在本机生成译文或双语 SRT；
 - 音频提取、语音识别、模型加载、逐条翻译和字幕生成均显示独立阶段与真实进度。
 
-Whisper 和 TranslateGemma 模型权重不包含在发行包内。请在扩展的“设置 → 外部组件”中选择模型、阅读相应许可并按需下载；下载完成后无需使用命令行。Linux 和 macOS 发行包目前不携带本地 ASR/翻译 sidecar。
+Whisper 和 TranslateGemma 模型权重不包含在发行包内。请在扩展的“设置 → 下载能力”中选择模型、阅读相应许可并按需下载；下载完成后无需使用命令行。Linux 和 macOS 发行包目前不携带本地 ASR/翻译 sidecar。
 
-## 使用效果
+## 界面预览
 
-<table>
-  <tr>
-    <td width="64%"><img src="docs/images/resource-detection.png" alt="DownKit 检测当前网页中的媒体资源"></td>
-    <td width="36%"><img src="docs/images/download-progress.png" alt="DownKit 下载任务进度"></td>
-  </tr>
-  <tr>
-    <td align="center">检测当前页面的媒体资源并发起下载</td>
-    <td align="center">查看实时速度、进度与任务状态</td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center">
-      <img src="docs/images/tool-registry.png" alt="DownKit 组件设置状态" width="42%"><br>
-      检查 Bridge、下载能力与外部组件状态
-    </td>
-  </tr>
-</table>
+![DownKit v1.2.0 资源嗅探初始界面](docs/images/first-run-detect-en.png)
+
+![DownKit v1.2.0 设置导航](docs/images/first-run-settings-en.png)
+
+以上为当前 v1.2.0 在隔离 Chromium 中的真实英文界面，尚未连接 Bridge 或开始下载，**不是下载成功截图**。新用户请先看[带截图的首次使用教程](docs/zh-CN/tutorial/first-run-on-new-machine.md)，连接异常看[故障排查](docs/zh-CN/how-to/troubleshoot.md)。
 
 ## 安装与使用
 
