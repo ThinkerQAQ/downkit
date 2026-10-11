@@ -469,14 +469,31 @@
     list.appendChild(card);
   }
 
+  async function refreshAbout() {
+    const appVersion = document.getElementById("aboutAppVersion");
+    const bridgeVersion = document.getElementById("aboutBridgeVersion");
+    appVersion.textContent = "读取中…";
+    bridgeVersion.textContent = "读取中…";
+    try {
+      const info = await api.send("ui.about");
+      appVersion.textContent = info.extensionVersion ? "v" + info.extensionVersion : "未知";
+      bridgeVersion.textContent = info.bridgeVersion ? "v" + info.bridgeVersion : "未连接";
+    } catch {
+      appVersion.textContent = "未连接";
+      bridgeVersion.textContent = "未连接";
+    }
+  }
+
   function renderTools(nextTools) {
     tools = Array.isArray(nextTools) ? nextTools : [];
     const list = document.getElementById("toolList");
     const preferences = document.getElementById("settingsInterface");
-    if (!list || !preferences) return;
+    const about = document.getElementById("settingsAbout");
+    if (!list || !preferences || !about) return;
     list.replaceChildren();
     list.hidden = false;
     preferences.hidden = true;
+    about.hidden = true;
     const frame = navigation[navigation.length - 1];
     if (!frame) {
       settingsHeading("设置", "下载、连接、组件与界面偏好");
@@ -495,6 +512,19 @@
           action: () => enter("category", kind)
         }));
       }
+      addSection(list, "其他");
+      list.appendChild(settingsRow({
+        title: "关于", subtitle: "版本与应用信息",
+        icon: "about", action: () => enter("about", "downkit")
+      }));
+      return;
+    }
+
+    if (frame.type === "about") {
+      settingsHeading("关于", "DownKit 版本与应用信息");
+      list.hidden = true;
+      about.hidden = false;
+      refreshAbout();
       return;
     }
 

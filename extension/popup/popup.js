@@ -91,8 +91,6 @@ function initLogsVisibility() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("extensionVersion").textContent =
-    DownKitPopup.host === "web" ? "Web UI" : `v${chrome.runtime.getManifest().version}`;
   const open = document.getElementById("openWorkspace");
   if (DownKitPopup.host === "web") open.hidden = true;
   open.addEventListener("click", async () => {

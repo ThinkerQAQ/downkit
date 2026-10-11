@@ -13,3 +13,10 @@ Popup and Side Panel use an icon rail, while Web UI uses a labelled sidebar. The
 ## View runtime logs
 
 Open the **Logs** item in the sidebar to inspect Bridge and Worker events. Search, filter by severity, auto-refresh, select, copy or clear the visible logs. The navigation item can be hidden in **Settings → Appearance & interaction → Show logs tab**; the files remain under `Data/logs/`.
+
+
+## Application version
+
+Open **Settings → About** to view the browser extension version and the
+running Bridge version. Both values are shown there for Popup, Side Panel and
+Web UI, rather than in the global header.

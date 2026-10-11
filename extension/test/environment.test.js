@@ -71,6 +71,10 @@ assert.match(backgroundSource, /v1\/tools\/whisper\/models\/install/);
 assert.match(backgroundSource, /bridge\.logs\.list/);
 assert.match(backgroundSource, /bridge\.logs\.clear/);
 assert.match(backgroundSource, /ui\.logs\.set/);
+assert.match(backgroundSource, /message\.action === "ui\.about"/);
+assert.match(backgroundSource, /chrome\.runtime\.getManifest\(\)\.version/);
+assert.match(backgroundSource, /bridgeFetch\("\/v1\/environment"\)/);
+
 assert.match(backgroundSource, /v1\/tools\/llama\/models\/install/);
 assert.match(backgroundSource, /model: String\(message\.model/);
 assert.match(environmentSource, /requiresLicenseAcceptance/);

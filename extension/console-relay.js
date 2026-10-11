@@ -6,6 +6,7 @@
   const allowed = new Set([
     "ui.open-mode.get", "ui.open-mode.set", "ui.active-tab",
     "ui.language.get", "ui.language.set",
+    "ui.about",
     "ui.logs.get", "ui.logs.set", "bridge.logs.list", "bridge.logs.clear",
     "media.list", "media.clear", "media.download", "media.playlist.probe",
     "bridge.environment", "bridge.tools", "bridge.tool.action", "bridge.config.save",

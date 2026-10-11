@@ -256,6 +256,20 @@
   "日志目录": "Log directory"
 });
 
+  Object.assign(dictionary, {
+    "关于": "About",
+    "其他": "Other",
+    "版本与应用信息": "Versions and application information",
+    "DownKit 版本与应用信息": "DownKit version and application information",
+    "应用版本": "App version",
+    "浏览器扩展版本": "Browser extension version",
+    "本地服务版本": "Local service version",
+    "DownKit Bridge 运行版本": "DownKit Bridge runtime version",
+    "读取中…": "Loading…",
+    "未连接": "Not connected",
+    "未知": "Unknown"
+  });
+
   let locale = "zh-CN";
   const source = new WeakMap();
   const lastDisplay = new WeakMap();

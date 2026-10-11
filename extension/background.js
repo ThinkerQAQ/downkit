@@ -396,6 +396,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.action) return;
 
+  if (message.action === "ui.about") {
+    const extensionVersion = chrome.runtime.getManifest().version;
+    bridgeFetch("/v1/environment")
+      .then(result => sendResponse({
+        ok: true,
+        extensionVersion,
+        bridgeVersion: result.environment?.version || null
+      }), () => sendResponse({ ok: true, extensionVersion, bridgeVersion: null }));
+    return true;
+  }
+
   if (message.action === "ui.language.get") {
     bridgeFetch("/v1/preferences")
       .then(result => sendResponse({ ok: true, locale: result.preferences.uiLanguage }),

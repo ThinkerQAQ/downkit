@@ -49,6 +49,15 @@ assert.match(environmentSource, /function goBack/);
 assert.match(html, /id="settingsInterface"/);
 assert.match(html, /id="uiLanguage"/);
 assert.match(html, /id="settingsBack"/);
+assert.doesNotMatch(html, /id="extensionVersion"/);
+assert.doesNotMatch(popupSource, /getManifest\(\)\.version/);
+assert.match(html, /id="settingsAbout"/);
+assert.match(html, /id="aboutAppVersion"/);
+assert.match(html, /id="aboutBridgeVersion"/);
+assert.match(environmentSource, /enter\("about", "downkit"\)/);
+assert.match(environmentSource, /frame\.type === "about"/);
+assert.match(environmentSource, /api\.send\("ui\.about"\)/);
+
 assert.match(html, /id="logsTab"/);
 assert.match(html, /id="logsPanel"/);
 assert.match(html, /id="logOutput"/);
