@@ -6,9 +6,17 @@ DownKit discovers HLS, DASH, MP4 and split media tracks in Chrome/Edge and downl
 
 ## Quick Start
 
+**New to DownKit?** Follow the [illustrated first-run guide](docs/tutorial/first-run-on-new-machine.md) for the release installation, browser extension, Bridge connection, and first download. The [troubleshooting guide](docs/how-to/troubleshoot.md) covers connection and media-detection failures.
+
 Download a [desktop release](https://github.com/ThinkerQAQ/downkit/releases) and extract the complete archive. On Windows run `bin\downkitdev.exe install`; on Linux/macOS run `./bin/downkitdev install`. All installer and release logic is Go-owned. Linux and macOS also require FFmpeg in PATH.
 
 Open `chrome://extensions` or `edge://extensions`, enable Developer mode and load the unpacked `extension/` folder. Play a video, click DownKit, detect its media and download it. The installed extension starts the Bridge automatically through Native Messaging.
+
+## Interface preview
+
+![DownKit v1.2.0 Detect interface](docs/images/first-run-detect-en.png)
+
+This is a genuine initial screen from an isolated Chromium profile. It has no detected media, and does not demonstrate a completed download. See the [first-run walkthrough](docs/tutorial/first-run-on-new-machine.md) for a second Settings screenshot and the exact steps.
 
 ## Control surfaces
 
