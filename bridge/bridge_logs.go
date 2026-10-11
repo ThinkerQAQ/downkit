@@ -76,11 +76,17 @@ func readRuntimeLogFile(path string) ([]runtimeLogEntry, error) {
 		}
 		message := fields[1]
 		level := "INFO"
-		if strings.Contains(message, "event=failed") || strings.Contains(message, "event=error") {
+		switch {
+		case strings.Contains(message, "level=ERROR"), strings.Contains(message, "event=failed"), strings.Contains(message, "event=error"):
 			level = "ERROR"
-		} else if strings.Contains(message, "event=warn") {
+		case strings.Contains(message, "level=WARN"), strings.Contains(message, "event=warn"):
 			level = "WARN"
+		case strings.Contains(message, "level=DEBUG"):
+			level = "DEBUG"
 		}
+		// The level is rendered separately by the viewer, so strip the
+		// structured level key from the displayed body (retain old logs).
+		message = strings.TrimPrefix(message, "level="+level+" ")
 		entries = append(entries, runtimeLogEntry{
 			Time:    stamp.Format(time.RFC3339),
 			Level:   level,

@@ -13,7 +13,7 @@ Windows 组件需要准备好后才能创建正式发行包：
 ```powershell
 go -C tools/downkitdev run . tool-install whisper
 go -C tools/downkitdev run . tool-install llama
-go -C tools/downkitdev run . components --root .devtool/out/release-stage/downkit-v1.2.0-windows-amd64 --os windows --arch amd64
+go -C tools/downkitdev run . components --root .devtool/out/release-stage/downkit-v1.2.1-windows-amd64 --os windows --arch amd64
 ```
 
 Linux/macOS 由 Go 维护工具自动选择平台与架构，并保持同样的目录布局。

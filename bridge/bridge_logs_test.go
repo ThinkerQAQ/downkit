@@ -71,3 +71,18 @@ func TestRuntimeLogsRequireToken(t *testing.T) {
 		}
 	}
 }
+
+func TestRuntimeLogsStructuredSeverityWithoutDuplicateLevel(t *testing.T) {
+	dir := t.TempDir()
+	line := "2026-10-11T10:00:00+08:00 level=WARN component=bridge event=restart_rejected reason=active_jobs\n"
+	if err := os.WriteFile(filepath.Join(dir, "bridge.log"), []byte(line), 0600); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := readRuntimeLogs(dir, 10)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("read: %#v %v", entries, err)
+	}
+	if entries[0].Level != "WARN" || strings.Count(entries[0].Raw, "WARN") != 1 {
+		t.Fatalf("structured level is duplicated: %#v", entries[0])
+	}
+}

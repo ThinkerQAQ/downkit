@@ -68,9 +68,11 @@ func (s *bridgeServer) handlePreferences(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err = saveBridgeConfig(c); err != nil {
+		appendRuntimeEvent("ERROR", "bridge", "preferences_save_failed", "reason", "io")
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "cannot save TOML"})
 		return
 	}
 	s.config = c
+	appendRuntimeEvent("INFO", "bridge", "preferences_saved")
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "preferences": preferencesOf(c)})
 }

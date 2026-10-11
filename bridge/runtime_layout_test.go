@@ -2,6 +2,7 @@ package downkit
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -62,5 +63,23 @@ func TestExistingTOMLDefaultsToShowingLogTab(t *testing.T) {
 	f.Interface.ShowLogs = &hidden
 	if configFromFile(f).ShowLogs {
 		t.Fatal("explicitly hidden log tab must remain hidden")
+	}
+}
+
+func TestRuntimeLogLineStructuredAndRedacted(t *testing.T) {
+	line := runtimeLogLine("INFO", "bridge", "phase_changed", "jobId", "012345abcdef", "phase", "downloading", "progress", "25")
+	for _, item := range []string{"level=INFO", "component=bridge", "event=phase_changed", "jobId=012345abcdef", "phase=downloading", "progress=25"} {
+		if !strings.Contains(line, item) {
+			t.Fatalf("missing %q: %s", item, line)
+		}
+	}
+	for _, fields := range [][]string{
+		{"url", "example.com"}, {"token", "abc"}, {"reason", "https://example.com/?cookie=secret"},
+		{"jobId", "1234567890123456789012345678901234567890123456789012345678901234"},
+		{"jobId", "not-a-job-id"}, {"progress", "101"}, {"phase", "bad value"},
+	} {
+		if got := runtimeLogLine("ERROR", "worker", "failed", fields...); got != "" {
+			t.Fatalf("unsafe log attribute accepted: %q", got)
+		}
 	}
 }
