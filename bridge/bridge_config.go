@@ -32,6 +32,7 @@ type bridgeConfig struct {
 	TranslationModel string `json:"translationModel"`
 	OpenMode         string `json:"openMode"`
 	UILanguage       string `json:"uiLanguage"`
+	ShowLogs         bool   `json:"showLogs"`
 	DetectHls        bool   `json:"detectHls"`
 	DetectDash       bool   `json:"detectDash"`
 	DetectMp4        bool   `json:"detectMp4"`
@@ -62,6 +63,7 @@ type fileConfig struct {
 	Interface struct {
 		OpenMode string `toml:"open_mode"`
 		Language string `toml:"language"`
+		ShowLogs *bool  `toml:"show_logs,omitempty"`
 	} `toml:"interface"`
 	Sniffer struct {
 		HLS  bool `toml:"hls"`
@@ -98,7 +100,7 @@ func defaultBridgeConfig() bridgeConfig {
 	disabled := false
 	return bridgeConfig{
 		OutputDir: dir, Concurrent: 12, ProxyEnabled: &disabled,
-		OpenMode: "popup", UILanguage: "zh-CN",
+		OpenMode: "popup", UILanguage: "zh-CN", ShowLogs: true,
 		DetectHls: true, DetectDash: true, DetectMp4: true,
 		LogEnabled: true, LogMaxMB: 10,
 	}
@@ -177,6 +179,7 @@ func configToFile(c bridgeConfig) fileConfig {
 	f.Tools.TranslationModel = c.TranslationModel
 	f.Interface.OpenMode = c.OpenMode
 	f.Interface.Language = c.UILanguage
+	f.Interface.ShowLogs = &c.ShowLogs
 	f.Sniffer.HLS = c.DetectHls
 	f.Sniffer.DASH = c.DetectDash
 	f.Sniffer.MP4 = c.DetectMp4
@@ -185,13 +188,17 @@ func configToFile(c bridgeConfig) fileConfig {
 	return f
 }
 func configFromFile(f fileConfig) bridgeConfig {
+	showLogs := true
+	if f.Interface.ShowLogs != nil {
+		showLogs = *f.Interface.ShowLogs
+	}
 	return bridgeConfig{
 		OutputDir: f.Download.OutputDir, Concurrent: f.Download.Concurrent, Quality: f.Download.Quality,
 		Proxy: f.Proxy.URL, ProxyEnabled: &f.Proxy.Enabled, ProxyHost: f.Proxy.Host, ProxyPort: f.Proxy.Port,
 		FFmpegPath: f.Tools.FFmpeg, YTDLPPath: f.Tools.YTDLP,
 		WhisperPath: f.Tools.Whisper, WhisperModel: f.Tools.WhisperModel,
 		LlamaPath: f.Tools.Llama, TranslationModel: f.Tools.TranslationModel,
-		OpenMode: f.Interface.OpenMode, UILanguage: f.Interface.Language,
+		OpenMode: f.Interface.OpenMode, UILanguage: f.Interface.Language, ShowLogs: showLogs,
 		DetectHls: f.Sniffer.HLS, DetectDash: f.Sniffer.DASH, DetectMp4: f.Sniffer.MP4,
 		LogEnabled: f.Logging.Enabled, LogMaxMB: f.Logging.MaxMB,
 	}

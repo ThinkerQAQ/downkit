@@ -20,6 +20,7 @@
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
     <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6M9 12h11"/></symbol>
     <symbol id="i-workspace" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M13 14h5m-2.5-2.5L18 14l-2.5 2.5"/></symbol>
+    <symbol id="i-logs" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h6"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-5L4 8m0-5v5h5M4 13a8 8 0 0 0 14 5l2-2m0 5v-5h-5"/></symbol>
   </svg>
   <header class="app-header">
@@ -46,6 +47,7 @@
   <nav class="tabs" role="tablist" aria-label="DownKit 功能导航">
     <button id="snifferTab" class="tab active" data-tab="sniffer" title="资源嗅探" aria-label="资源嗅探" role="tab" aria-controls="snifferPanel" aria-selected="true" tabindex="0"><svg class="ui-icon" aria-hidden="true"><use href="#i-detect"></use></svg><span>资源嗅探</span></button>
     <button id="jobsTab" class="tab" data-tab="jobs" title="下载任务" aria-label="下载任务" role="tab" aria-controls="jobsPanel" aria-selected="false" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#i-download"></use></svg><span>下载任务</span></button>
+    <button id="logsTab" class="tab" data-tab="logs" title="日志" aria-label="日志" role="tab" aria-controls="logsPanel" aria-selected="false" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#i-logs"></use></svg><span>日志</span></button>
     <button id="environmentTab" class="tab" data-tab="environment" title="设置" aria-label="设置" role="tab" aria-controls="environmentPanel" aria-selected="false" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#i-settings"></use></svg><span>设置</span></button>
   </nav>
 
@@ -135,6 +137,32 @@
     </div>
   </section>
 
+  <section id="logsPanel" class="panel" data-panel="logs" role="tabpanel" aria-labelledby="logsTab">
+    <div class="content-card logs-card">
+      <div class="section-heading">
+        <div><h2>运行日志</h2><p>查看 DownKit Bridge 与下载 Worker 的本地运行记录。</p></div>
+        <strong id="logsStatus" class="log-status checking">读取中</strong>
+      </div>
+      <div class="log-toolbar">
+        <label class="log-search"><span>搜索</span><input id="logQuery" type="search" placeholder="事件 / component / error"></label>
+        <label class="log-filter"><span>显示级别</span><select id="logLevelFilter">
+          <option value="">全部</option><option value="DEBUG">DEBUG</option><option value="INFO">INFO</option>
+          <option value="WARN">WARN</option><option value="ERROR">ERROR</option>
+        </select></label>
+        <label class="log-follow"><span>自动刷新</span><input id="logAutoRefresh" type="checkbox" checked></label>
+        <div class="log-actions">
+          <button id="selectAllLogs" class="secondary" type="button">全选</button>
+          <button id="copyLogs" class="secondary" type="button">复制</button>
+          <button id="refreshLogs" class="secondary" type="button">刷新</button>
+          <button id="clearLogs" class="secondary danger-action" type="button">清空</button>
+        </div>
+      </div>
+      <code id="logPath" class="log-path">-</code>
+      <pre id="logOutput" class="log-viewer">暂无日志</pre>
+      <p id="logsMessage" class="message" role="status"></p>
+    </div>
+  </section>
+
   <section id="environmentPanel" class="panel" data-panel="environment" role="tabpanel" aria-labelledby="environmentTab">
     <div class="settings-page-header">
       <button id="settingsBack" class="settings-back" type="button" hidden aria-label="返回上一级">
@@ -166,6 +194,10 @@
             <option value="popup">弹出窗口（默认）</option>
             <option value="sidePanel">浏览器侧边栏</option>
           </select>
+        </div>
+        <div class="settings-preference-row">
+          <div><label for="showLogsTab">显示日志入口</label><small>仅隐藏导航入口，不影响日志写入</small></div>
+          <input id="showLogsTab" type="checkbox" checked role="switch" aria-label="显示日志入口">
         </div>
         <p class="settings-help">配置统一保存在 Data/config.toml。</p>
       </div>
@@ -254,6 +286,7 @@
   <script src="core.js"></script>
   <script src="environment.js"></script>
   <script src="jobs.js"></script>
+  <script src="logs.js"></script>
   <script src="playlist-dialog.js"></script>
   <script src="downloads.js"></script>
   <script src="popup.js"></script>

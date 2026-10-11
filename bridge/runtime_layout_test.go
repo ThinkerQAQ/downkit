@@ -27,6 +27,7 @@ func TestConfigTOMLGroupedRoundTrip(t *testing.T) {
 	c.Quality = "best"
 	c.UILanguage = "en"
 	c.OpenMode = "sidePanel"
+	c.ShowLogs = false
 	c.DetectDash = false
 	c.LogMaxMB = 20
 	data, err := toml.Marshal(configToFile(c))
@@ -46,7 +47,20 @@ func TestConfigTOMLGroupedRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.OutputDir != want.OutputDir || got.Concurrent != 32 || got.UILanguage != "en" ||
-		got.OpenMode != "sidePanel" || got.DetectDash || got.LogMaxMB != 20 {
+		got.OpenMode != "sidePanel" || got.ShowLogs || got.DetectDash || got.LogMaxMB != 20 {
 		t.Fatalf("round trip mismatch: %#v", got)
+	}
+}
+
+func TestExistingTOMLDefaultsToShowingLogTab(t *testing.T) {
+	var f fileConfig
+	f.Interface.Language = "zh-CN"
+	if !configFromFile(f).ShowLogs {
+		t.Fatal("existing TOML without show_logs must default to true")
+	}
+	hidden := false
+	f.Interface.ShowLogs = &hidden
+	if configFromFile(f).ShowLogs {
+		t.Fatal("explicitly hidden log tab must remain hidden")
 	}
 }

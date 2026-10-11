@@ -442,6 +442,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === "ui.logs.get") {
+    bridgeFetch("/v1/preferences")
+      .then(result => sendResponse({ ok: true, showLogs: result.preferences.showLogs !== false }),
+        error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "ui.logs.set") {
+    bridgeFetch("/v1/preferences", { method: "PUT", body: JSON.stringify({ showLogs: Boolean(message.showLogs) }) })
+      .then(result => sendResponse({ ok: true, showLogs: result.preferences.showLogs }),
+        error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "bridge.logs.list") {
+    const limit = Math.max(1, Math.min(Number(message.limit) || 1000, 1000));
+    bridgeFetch("/v1/logs?limit=" + limit)
+      .then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+  if (message.action === "bridge.logs.clear") {
+    bridgeFetch("/v1/logs", { method: "DELETE" })
+      .then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
   if (message.action === "media.detected") {
     const tabId = sender.tab && sender.tab.id;
     record({

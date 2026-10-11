@@ -166,6 +166,7 @@ func runBridge() error {
 	mux.HandleFunc("/v1/environment", server.handleEnvironment)
 	mux.HandleFunc("/v1/config", server.handleConfig)
 	mux.HandleFunc("/v1/preferences", server.handlePreferences)
+	mux.HandleFunc("/v1/logs", server.handleLogs)
 	mux.HandleFunc("/v1/tools", server.handleTools)
 	mux.HandleFunc("/v1/tools/yt-dlp/install", server.handleInstallYTDLP)
 	mux.HandleFunc("/v1/tools/whisper/models/install", server.handleInstallWhisperModel)
@@ -225,7 +226,7 @@ func (s *bridgeServer) allowExtension(response http.ResponseWriter, request *htt
 		response.Header().Set("Vary", "Origin")
 	}
 	response.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-DownKit-Token")
-	response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+	response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 }
 
 func writeJSON(response http.ResponseWriter, status int, value any) {
@@ -589,6 +590,7 @@ func (s *bridgeServer) handleConfig(response http.ResponseWriter, request *http.
 		s.mu.Lock()
 		config.OpenMode = s.config.OpenMode
 		config.UILanguage = s.config.UILanguage
+		config.ShowLogs = s.config.ShowLogs
 		config.DetectHls = s.config.DetectHls
 		config.DetectDash = s.config.DetectDash
 		config.DetectMp4 = s.config.DetectMp4
