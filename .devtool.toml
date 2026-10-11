@@ -58,7 +58,7 @@ loader = "go-module"
 
 [extension.scm.loader_config]
 module = "github.com/thinkerqaq/devtool"
-version = "03540c8e134b1d2913b52d74ce079857c19ea12f"
+version = "fbf2f14a448c064e3698cde1ff48bc86a319d9e0"
 package = "./extensions/scm/github/cmd/provider"
 
 [service.environment]
@@ -143,3 +143,49 @@ provider = "context.document.composite"
 provider = "document.realtime.marksman"
 [service.document-structure]
 provider = "document.markdown.goldmark"
+
+# Reuse the existing DV2 workspace provider; no custom Git worktree wrapper.
+[extension.workspace]
+loader = "go-module"
+[extension.workspace.loader_config]
+module = "github.com/thinkerqaq/devtool"
+version = "fbf2f14a448c064e3698cde1ff48bc86a319d9e0"
+package = "./extensions/workspace/git/cmd/provider"
+
+[extension.workspace-capability]
+loader = "go-module"
+[extension.workspace-capability.loader_config]
+module = "github.com/thinkerqaq/devtool"
+version = "fbf2f14a448c064e3698cde1ff48bc86a319d9e0"
+package = "./extensions/capability/workspace/cmd/provider"
+
+[service.workspace]
+provider = "workspace.git"
+
+# Expose existing configured SCM Provider through DV2 intent-level tools.
+[extension.scm-capability]
+loader = "go-module"
+[extension.scm-capability.loader_config]
+module = "github.com/thinkerqaq/devtool"
+version = "fbf2f14a448c064e3698cde1ff48bc86a319d9e0"
+package = "./extensions/capability/scm/cmd/provider"
+
+# SCM v2 uses the existing replaceable credential service rather than bespoke auth.
+[extension.credential-store]
+loader = "go-module"
+[extension.credential-store.loader_config]
+module = "github.com/thinkerqaq/devtool"
+version = "fbf2f14a448c064e3698cde1ff48bc86a319d9e0"
+package = "./extensions/credential/file/cmd/provider"
+
+[extension.credential]
+loader = "go-module"
+[extension.credential.loader_config]
+module = "github.com/thinkerqaq/devtool"
+version = "fbf2f14a448c064e3698cde1ff48bc86a319d9e0"
+package = "./extensions/credential/github/cmd/provider"
+
+[service.credential-store]
+provider = "credential.store.file"
+[service.credential]
+provider = "credential.github"

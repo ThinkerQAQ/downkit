@@ -33,3 +33,7 @@ Thumbs.db
 # DevTool-generated local state
 /.devtool/
 /.serena/
+
+# Optional Python benchmarking caches
+__pycache__/
+*.pyc
