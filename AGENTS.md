@@ -38,6 +38,8 @@ Use DEV2-discovered project commands (`devtool verify`, `devtool build`, `devtoo
 
 Inspect first, make focused changes, run DEV2 verification and test relevant browser surfaces. Android verification needs the Android SDK and appropriate build environment.
 
+Prefer a persistent DV2 MCP connection with `workspace_create/list/inspect/remove`, `project_verify`, `project_build` and `scm_publish` over repeated Desktop Commander shell/poll calls. Browser capture is an optional test: use `tools/browser-acceptance.mjs` with isolated profiles and guaranteed cleanup; never leave ad-hoc Puppeteer subprocesses running.
+
 For changes run `devtool verify` and `devtool code verify`. DEVTool delegates to `tools/downkitdev`, the single Go maintenance implementation; `devtool package` builds release archives. Do not invoke removed PowerShell/Shell launchers.
 
 Reload the unpacked browser extension after JavaScript, CSS, manifest or locale changes; restarting Bridge does not reload extension assets. Do not commit or push unless explicitly requested.
