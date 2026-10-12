@@ -18,4 +18,4 @@ DownKit 使用浏览器扩展检测网页媒体，由本地 Go Bridge 执行下�
 
 代码开发遵循根目录 [AGENTS.md](../../AGENTS.md)。
 
-开发与发布工作流：[DEVTool 与 Go 工程管理](architecture/devtool.md)。
+开发与发布工作流：[Go 工程维护与原生工具](architecture/maintenance.md)。

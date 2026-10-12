@@ -19,4 +19,4 @@ DownKit detects media in the browser and downloads it using a local Go Bridge. T
 
 For code changes start with the repository-level [Agent Contract](../AGENTS.md).
 
-Development and release workflows: [DEVTool and Go maintenance](architecture/devtool.md).
+Development and release workflows: [Go maintenance and native tooling](architecture/maintenance.md).

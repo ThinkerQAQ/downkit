@@ -18,4 +18,4 @@
 
 更多入口：[新电脑首次使用](tutorial/first-run-on-new-machine.md) · [Web UI](how-to/use-web-ui.md) · [工具配置](how-to/configure-tools.md) · [故障排查](how-to/troubleshoot.md)。
 
-使用发行包**不需要 DEVTool**；从源码开发请先看 [AGENTS.md](../../AGENTS.md) 和 [DEVTool](architecture/devtool.md)。
+使用发行包**不需要开发工具**；从源码开发请先看 [AGENTS.md](../../AGENTS.md) 与 [Go 工程维护](architecture/maintenance.md)。

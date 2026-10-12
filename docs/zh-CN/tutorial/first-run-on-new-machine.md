@@ -85,4 +85,4 @@ Linux/macOS：
 
 ## 复现记录
 
-2026-10-11 使用 **DEVTool** 检查当前源码，验证项目配置，执行 \`DEVTOOL_PROFILES=local devtool build\` 构建 Linux Bridge；在临时 HOME 与 Data 目录下验证了安装命令，并用隔离 Chromium 加载 v1.2.0 英文扩展。由于这个隔离浏览器的 Native Messaging 未接通，图片记录的是**真实初始/未连接界面**，没有伪造媒体资源或任务，也**没有宣称完整下载链路通过**。
+2026-10-11 曾使用当时的开发工具完成源码检查和 Linux Bridge 构建（现已切换为原生 Go 维护程序）；在临时 HOME 与 Data 目录下验证了安装命令，并用隔离 Chromium 加载 v1.2.0 英文扩展。由于这个隔离浏览器的 Native Messaging 未接通，图片记录的是**真实初始/未连接界面**，没有伪造媒体资源或任务，也**没有宣称完整下载链路通过**。

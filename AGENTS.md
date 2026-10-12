@@ -1,55 +1,69 @@
 # DownKit — Agent Contract
 
-DownKit is a browser-integrated media downloader. The browser extension owns page detection, cookies and authorization. The local Go Bridge owns desktop task state, downloading, persistence and media tool orchestration. Android is a separate native client.
+DownKit is a browser-integrated media downloader. The browser extension owns page detection, cookies and authorization. The local Go Bridge owns desktop jobs, downloads, persistence and media tools. Android is an independent native client.
 
-## First minute
+## Start here
 
 Run from the repository root:
 
-```bash
-devtool version
-devtool config validate
-devtool project inspect --json
-devtool code doctor
+```sh
+go -C tools/downkitdev run . verify
+go -C tools/downkitdev run . build
 ```
 
-Use DEV2-discovered project commands (`devtool verify`, `devtool build`, `devtool package`) instead of an independent build pipeline. For code understanding use the DEV2 `code_context` capability; for documentation use `document_context` with bounded review and follow its cursor. Review Markdown through Goldmark/Marksman, not `devtool code verify`.
+The Go maintenance tool in `tools/downkitdev/` is the **only** implementation of project build, verification, packaging, deployment and tool installation. Inspect `docs/architecture/maintenance.md` for all commands and platform requirements; do not add a second build wrapper.
+
+## Code intelligence and direct tools
+
+Prefer native LSP capabilities when your editor or Agent exposes an LSP client:
+
+| Language | Server | Scope and useful operations |
+| --- | --- | --- |
+| Go | `gopls serve` | `bridge/`, `tools/downkitdev/` (separate Go modules); symbols, definitions, references, implementations, rename and diagnostics |
+| JavaScript/HTML/CSS | Editor's installed language servers, if available | `extension/`; navigation, references and diagnostics (check which languages and features the client supports) |
+| Markdown | `marksman server` | `README*.md`, `AGENTS.md`, `docs/`; headings, links, definitions and references |
+
+These servers use the Language Server Protocol over standard I/O and require an **LSP client**. Do not treat the binaries as one-shot analysis commands, or claim a provider is configured when it is not. For Go, `gopls symbols`, `gopls definition`, `gopls references` and `gopls check` can also be used directly after checking their argument formats. For browsers without an installed JS language server, use source reads, `rg`, `node --check` and the existing JS tests rather than creating a new adapter. Review long Markdown files section by section; a symbol outline alone is not a complete review.
+
+Use standard `git status/diff/log`, `rg`, and file reads/edits for repository work. Avoid duplicate code indexes or project-specific gateways. Tool failures must be reported, not silently substituted with invented success.
 
 ## Architecture invariants
 
-- Mature components first: inspect existing SDKs, protocols, open source and media tools before building new ones.
-- Minimal Go core with modular, replaceable tool integrations. No duplicated feature state in Popup, Side Panel or Web UI.
-- Browser page sessions stay in the extension. Never send Native Messaging tokens, cookies or credentials to Web UI assets, storage, logs or docs.
-- Web UI may serve shared extension assets from loopback, but privileged actions must cross the extension relay.
-- Keep tool configuration explicit. Distinguish read-only detection from downloading, file deletion and other side effects.
-- Keep interface locale separate from ASR language, subtitle language and downloaded media.
-- Respect platform capability differences; desktop Bridge and Android are separate runtimes.
+- Reuse mature tools and SDKs before implementing infrastructure.
+- Keep the Go core minimal, modular and replaceable. Popup, Side Panel and Web UI share task and settings state.
+- Browser page sessions remain in the extension. Never copy Native Messaging secrets, cookies or authorization material into Web UI assets, persistent storage, logs or documentation.
+- The Web UI may serve shared extension assets on loopback; privileged operations must cross the extension relay.
+- Keep tool configuration explicit. Separate read-only detection from downloading, file deletion and other side effects.
+- Interface locale, ASR language, subtitle language and downloaded media settings are separate.
+- Desktop Bridge and Android are different runtimes with different upstream capabilities.
 
 ## Source map
 
-- Desktop API and downloads: `bridge/`
-- Browser host and UI: `extension/background.js`, `extension/popup/`, `extension/console-relay.js`
+- Desktop Bridge/API and downloader: `bridge/`
+- Browser host, UI and tests: `extension/background.js`, `extension/popup/`, `extension/test/`
 - Android: `mobile/android/`
-- DEV2 Project Extension: `devcontrol/`
-- Entry documentation: [docs/index.md](docs/index.md), [中文文档](docs/zh-CN/index.md)
-- API details: [docs/reference/bridge-api.md](docs/reference/bridge-api.md)
+- Native Go maintenance and release logic: `tools/downkitdev/`
+- Entry documentation: [English](docs/index.md) · [中文](docs/zh-CN/index.md)
+- API reference: [Bridge API](docs/reference/bridge-api.md)
 
-## Verification and delivery
+## Build, verification and deployment
 
-Inspect first, make focused changes, run DEV2 verification and test relevant browser surfaces. Android verification needs the Android SDK and appropriate build environment.
+```sh
+go -C tools/downkitdev run . verify
+go -C tools/downkitdev run . build --os windows --arch amd64
+go -C tools/downkitdev run . package
+# Explicitly incomplete development release only:
+go -C tools/downkitdev run . package --allow-missing-tools
+```
 
-For changes run `devtool verify` and `devtool code verify`. DEVTool delegates to `tools/downkitdev`, the single Go maintenance implementation; `devtool package` builds release archives. Do not invoke removed PowerShell/Shell launchers.
+`verify` runs Go tests, browser JavaScript syntax checks and the extension's JS tests. It is not a substitute for browser UI or Android-device acceptance. Formal release packaging requires verified third-party sidecars and source/licence assets; never silently switch to `--allow-missing-tools` for publishing.
 
-Reload the unpacked browser extension after JavaScript, CSS, manifest or locale changes; restarting Bridge does not reload extension assets. Do not commit or push unless explicitly requested.
+Android uses the official Gradle Wrapper, Go mobile toolchain and Android SDK/NDK. FFmpeg uses upstream configure/make and native toolchains. Deploying to Windows is an explicit side effect: stop the running Bridge before `go -C tools/downkitdev run . deploy --os windows --arch amd64 --target /mnt/c/software/Coding/downkit`; never overwrite `Data/`. Reload the unpacked browser extension after HTML, JS, CSS, manifest or locale changes; a Bridge restart alone does not reload those assets.
+
+Keep changes small, inspect the diff, commit/push coherent work when requested, and verify before delivery. Do not merge without explicit approval.
 
 ## Local configuration and data
 
-Installed binaries reside in `bin/`; local runtime files are stored in the sibling `Data/` directory. Edit `Data/config.toml` for the download, proxy, tools, interface, sniffer and logging settings. Job state (`jobs.json`), Bridge runtime state (`bridge.json`), logs, models, downloaded tool components and staging checkpoints live under `Data/`. Native Messaging requires a JSON registration manifest at `Data/native-host/com.downkit.bridge.json`; it is generated protocol metadata, not a user config file. Existing download destinations remain unchanged when migrating legacy configuration.
+Installed binaries are under `bin/`. `Data/config.toml` is the durable product configuration; `Data/jobs.json`, `Data/bridge.json`, `Data/logs/`, `Data/models/`, `Data/tools/` and `Data/work/` hold persistent or generated runtime data. `Data/native-host/com.downkit.bridge.json` is browser protocol metadata, not user configuration. Build outputs and caches live under ignored `.build/`; these must never be confused with installed `Data/`.
 
-## Go-only maintenance workflow
-
-- Use `devtool verify`, `devtool build`, `devtool package`, `devtool code verify` and `devtool project inspect --json` as authoritative engineering entry points.
-- DEVTool Project Extension lives in `devcontrol/` and delegates operations to `tools/downkitdev/`. Maintain only one implementation of build, packaging, install, dependency resolution and asset generation in Go.
-- Official Gradle Wrapper remains for Android. FFmpeg configure/make, MSYS2, Android SDK/NDK and gomobile remain upstream toolchains invoked from Go. No custom PowerShell, Shell or CMD orchestration is kept.
-- Windows packages install with `bin/downkitdev.exe install` and uninstall with `bin/downkitdev.exe uninstall`. The Go deployer must never overwrite the installed `Data/`.
-- See [DEVTool architecture](docs/architecture/devtool.md) before changing project tasks.
+The Go installer registers Native Messaging and the URL protocol. Installing, deploying, or uninstalling program registrations must not erase existing downloads or user data.

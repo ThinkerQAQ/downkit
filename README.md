@@ -33,7 +33,7 @@ See [Quick Start](docs/quick-start.md), [Tutorial](docs/tutorial/first-download.
 
 ## Development
 
-DownKit is managed through DEV2. Start with [AGENTS.md](AGENTS.md), run `devtool config validate` and `devtool project inspect --json`, then use the declared `devtool verify` and `devtool build` commands. Go-owned build and verification commands replace the legacy shell completion gate.
+DownKit uses the native Go maintainer in `tools/downkitdev/` for engineering tasks. Start with [AGENTS.md](AGENTS.md) and run `go -C tools/downkitdev run . verify` or `go -C tools/downkitdev run . build`. See the [maintenance guide](docs/architecture/maintenance.md) for packaging, toolchains and deployment.
 
 Project code and documentation are Apache-2.0 licensed. Bundled third-party tools carry their own licence terms; see [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
@@ -41,4 +41,4 @@ Project code and documentation are Apache-2.0 licensed. Bundled third-party tool
 
 Installed binaries reside in `bin/`; local runtime files are stored in the sibling `Data/` directory. Edit `Data/config.toml` for the download, proxy, tools, interface, sniffer and logging settings. Job state (`jobs.json`), Bridge runtime state (`bridge.json`), logs, models, downloaded tool components and staging checkpoints live under `Data/`. Native Messaging requires a JSON registration manifest at `Data/native-host/com.downkit.bridge.json`; it is generated protocol metadata, not a user config file. Existing download destinations remain unchanged when migrating legacy configuration.
 
-DEVTool delegates to [the Go maintainer](docs/architecture/devtool.md) in `tools/downkitdev/` for release packaging, installation and cross-platform builds. The native Media and Android SDKs keep their upstream build tools.
+The [Go maintainer](docs/architecture/maintenance.md) in `tools/downkitdev/` owns release packaging, installation and cross-platform builds. Media and Android SDKs retain their upstream build tools.

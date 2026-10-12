@@ -85,8 +85,8 @@ You can also use **Open workspace** in the extension header for a larger browser
 - **Missing FFmpeg or unsupported format:** inspect Download capabilities; Linux/macOS need an external FFmpeg installation.
 - **Failed job:** inspect the error and the Bridge logs in \`Data/logs/\`. Do not assume the page or source supports downloading.
 
-See [Troubleshooting](../how-to/troubleshoot.md) and [Configuration](../reference/configuration.md). For developers, [DEVTool](../architecture/devtool.md) explains the supported build and verification commands.
+See [Troubleshooting](../how-to/troubleshoot.md) and [Configuration](../reference/configuration.md). For developers, [Go maintenance](../architecture/maintenance.md) explains the supported build and verification commands.
 
 ## Reproduction notes
 
-On 2026-10-11, the current source was inspected via **DEVTool**, its configuration was validated, and the Linux Bridge was built using \`DEVTOOL_PROFILES=local devtool build\`. The packaged-layout installer was exercised with a **temporary HOME and Data directory**, and Chromium loaded the real v1.2.0 extension. Its isolated Native Messaging connection could not be established; the screenshots therefore show initial/disconnected states and **no fabricated resources, jobs, or successful downloads**. A complete browser-to-download run on a new machine is **not claimed** here.
+On 2026-10-11, the Linux Bridge was built using the development tooling available at that time (now replaced by the native Go maintainer). The packaged-layout installer was exercised with a **temporary HOME and Data directory**, and Chromium loaded the real v1.2.0 extension. Its isolated Native Messaging connection could not be established; the screenshots therefore show initial/disconnected states and **no fabricated resources, jobs, or successful downloads**. A complete browser-to-download run on a new machine is **not claimed** here.
