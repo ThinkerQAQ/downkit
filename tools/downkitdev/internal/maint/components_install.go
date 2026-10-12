@@ -32,7 +32,7 @@ func InstallTool(root, name, provided string) error {
 	} else {
 		value.name = "llama.cpp"
 	}
-	cached := filepath.Join(root, ".devtool", "cache", "components", name, value.tag, value.archive)
+	cached := filepath.Join(root, ".build", "cache", "components", name, value.tag, value.archive)
 	if err := ensureDir(filepath.Dir(cached)); err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func InstallTool(root, name, provided string) error {
 		return err
 	}
 	defer input.Close()
-	stage := filepath.Join(root, ".devtool", "cache", "components", name, value.tag, "stage")
+	stage := filepath.Join(root, ".build", "cache", "components", name, value.tag, "stage")
 	if err := os.RemoveAll(stage); err != nil {
 		return err
 	}

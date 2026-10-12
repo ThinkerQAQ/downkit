@@ -34,13 +34,13 @@ func Package(root, requested string, allowMissing bool, source string) error {
 	if !strings.Contains(string(code), `const bridgeVersion = "`+current+`"`) {
 		return fmt.Errorf("Bridge version does not match extension %s", current)
 	}
-	output := filepath.Join(root, ".devtool", "artifacts", "release", "v"+current)
+	output := filepath.Join(root, ".build", "artifacts", "release", "v"+current)
 	if err := ensureDir(output); err != nil {
 		return err
 	}
 	for _, t := range targets() {
 		name := fmt.Sprintf("downkit-v%s-%s-%s", current, t.Name, t.Arch)
-		stage := filepath.Join(root, ".devtool", "out", "release-stage", name)
+		stage := filepath.Join(root, ".build", "out", "release-stage", name)
 		if err := os.RemoveAll(stage); err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func Package(root, requested string, allowMissing bool, source string) error {
 	// Official releases include the corresponding source archive for the
 	// bundled Windows FFmpeg binary. Incomplete development bundles may omit it.
 	if source == "" {
-		source = filepath.Join(root, ".devtool", "cache", "source", "FFmpeg-n8.1.2-source.tar.gz")
+		source = filepath.Join(root, ".build", "cache", "source", "FFmpeg-n8.1.2-source.tar.gz")
 	}
 	if _, err := os.Stat(source); err != nil {
 		if !allowMissing {

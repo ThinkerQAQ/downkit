@@ -222,7 +222,7 @@ func Build(root, targetOS, targetArch, output string) error {
 		if targetOS == "windows" {
 			suffix = ".exe"
 		}
-		output = filepath.Join(root, ".devtool", "out", fmt.Sprintf("downkit-%s-%s%s", targetOS, targetArch, suffix))
+		output = filepath.Join(root, ".build", "out", fmt.Sprintf("downkit-%s-%s%s", targetOS, targetArch, suffix))
 	}
 	absolute, err := filepath.Abs(output)
 	if err != nil {
