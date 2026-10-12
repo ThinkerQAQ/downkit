@@ -120,7 +120,7 @@ func AndroidBuild(root string) error {
 		return err
 	}
 	src := filepath.Join(root, "mobile", "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk")
-	dst := filepath.Join(root, ".devtool", "artifacts", "android", "downkit-android-arm64-debug.apk")
+	dst := filepath.Join(root, ".build", "artifacts", "android", "downkit-android-arm64-debug.apk")
 	if err := copyFile(src, dst); err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func FFmpegNative(root, source, output, version string) error {
 	if _, err := os.Stat(filepath.Join(source, "configure")); err != nil {
 		return errors.New("FFmpeg configure missing")
 	}
-	work := filepath.Join(root, ".devtool", "cache", "ffmpeg-slim", "build")
+	work := filepath.Join(root, ".build", "cache", "ffmpeg-slim", "build")
 	if err := ensureDir(work); err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func FFmpegAndroid(root, source, output string) error {
 		return err
 	}
 	if output == "" {
-		output = filepath.Join(root, ".devtool", "artifacts", "android", "ffmpeg")
+		output = filepath.Join(root, ".build", "artifacts", "android", "ffmpeg")
 	}
 	host := "linux-x86_64"
 	if runtime.GOOS == "darwin" {

@@ -39,7 +39,7 @@ func FFmpegWindows(root, source, output, tag string) error {
 	if err := run(root, env, msys, "-lc", "pacman -S --needed --noconfirm make diffutils curl pkgconf mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm"); err != nil {
 		return err
 	}
-	cache := filepath.Join(root, ".devtool", "cache", "ffmpeg", tag)
+	cache := filepath.Join(root, ".build", "cache", "ffmpeg", tag)
 	if err := ensureDir(cache); err != nil {
 		return err
 	}

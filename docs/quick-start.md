@@ -24,4 +24,4 @@ For a careful explanation of resource selection and job status, follow [First do
 - [Tools](how-to/configure-tools.md): choose FFmpeg, yt-dlp, subtitles and models
 - [Troubleshooting](how-to/troubleshoot.md): resolve connection, empty resources, and failed jobs
 
-You do **not** need DEVTool to run a release. Developers should start with [AGENTS.md](../AGENTS.md) and [DEVTool](architecture/devtool.md).
+A release requires no development tools. Developers should start with [AGENTS.md](../AGENTS.md) and [Go maintenance](architecture/maintenance.md).

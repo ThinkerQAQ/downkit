@@ -1,6 +1,5 @@
-# Local caches and diagnostics
+# Local caches and build outputs
 /.cache/
-/.codex-diagnostics/
 /.build/
 
 # Release and generated artifacts
@@ -27,9 +26,5 @@
 .DS_Store
 Thumbs.db
 
-# Unrelated local notes
-/6周驾驶训练营_理论实操一体化_V2.md
-
-# DevTool-generated local state
-/.devtool/
+# Optional Serena editor state
 /.serena/

@@ -49,6 +49,10 @@ Windows、Linux 和 macOS 的整体流程相同：加载浏览器扩展、注册
 
 DownKit 自有代码和文档采用 [Apache License 2.0](LICENSE)；随项目分发的第三方组件仍遵循各自的许可证，详情见 [NOTICE](NOTICE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
+## 开发与构建
+
+项目使用 `tools/downkitdev/` 原生 Go 维护程序，不依赖额外的开发网关。进入仓库根目录后运行 `go -C tools/downkitdev run . verify` 和 `go -C tools/downkitdev run . build`；发行打包、部署及平台依赖参阅[工程维护指南](docs/zh-CN/architecture/maintenance.md)。Agent 规范见 [AGENTS.md](AGENTS.md)。
+
 ## 本地配置与数据
 
 Windows 手动部署推荐把二进制放在根目录 `bin/`，把浏览器扩展放在 `extension/`，把 FFmpeg、Whisper 和 Llama 等随包组件放在 `tools/`。本地状态放在与 `bin` 同级的 `Data/`。

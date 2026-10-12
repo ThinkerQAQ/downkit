@@ -217,7 +217,7 @@ func Deploy(root, target, targetOS, targetArch string) error {
 	if platform == "darwin" {
 		platform = "macos"
 	}
-	buildBridge := filepath.Join(root, ".devtool", "out", "downkit-"+platform+"-"+targetArch+ext)
+	buildBridge := filepath.Join(root, ".build", "out", "downkit-"+platform+"-"+targetArch+ext)
 	if err := Build(root, targetOS, targetArch, buildBridge); err != nil {
 		return err
 	}
